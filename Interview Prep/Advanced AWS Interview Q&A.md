@@ -38,8 +38,7 @@ Lambda in Account A (us-east-1) writes logs to an S3 bucket in Account B (ap-sou
 - KMS key in Account B must include:
     
     ```json
-    json
-    CopyEdit
+   
     "Principal": {
       "AWS": "arn:aws:iam::<AccountA>:role/<LambdaRole>"
     }
@@ -143,8 +142,7 @@ Your DevOps account needs to deploy EC2-based apps into Account B’s environmen
 - In Account B:
     
     ```json
-    json
-    CopyEdit
+
     "Effect": "Allow",
     "Principal": {
       "AWS": "arn:aws:iam::<DevOpsAccount>:role/<CodeDeployRole>"
