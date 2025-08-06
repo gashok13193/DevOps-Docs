@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pod-monitor
+  namespace: default
+spec:
+  serviceAccountName: pod-monitor
+  containers:
+    - name: python
+      image: python:3.10-slim
+      command: ["sleep"]
+      args: ["3600"]
