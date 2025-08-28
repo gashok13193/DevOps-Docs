@@ -1,0 +1,30 @@
+# 1) Point repo to v1.31 and refresh
+sudo rm -f /etc/apt/keyrings/kubernetes-apt-keyring.gpg
+sudo mkdir -p /etc/apt/keyrings
+curl -fsSL https://pkgs.k8s.io/core:/stable:/v1.31/deb/Release.key | sudo gpg --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg
+echo "deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/v1.31/deb/ /" | sudo tee /etc/apt/sources.list.d/kubernetes.list
+sudo apt-get update
+
+# 2) Remove holds and install exact 1.31.x binaries
+sudo apt-mark unhold kubeadm kubelet kubectl
+# Pick the latest shown by your madison output; e.g. 1.31.12-1.1
+export V=1.31.12-1.1
+sudo apt-get install -y --allow-downgrades --allow-change-held-packages kubeadm=$V
+kubeadm version -o short   # should now show v1.31.x
+
+# 3) Drain and upgrade control plane
+NODE=$(kubectl get nodes -o jsonpath='{.items[0].metadata.name}')
+kubectl drain "$NODE" --ignore-daemonsets --delete-emptydir-data --force
+sudo kubeadm upgrade apply -y v${V%%-*}   # e.g. v1.31.12
+
+# 4) Upgrade kubelet/kubectl to same 1.31.x and restart kubelet
+sudo apt-get install -y --allow-change-held-packages kubelet=$V kubectl=$V
+sudo systemctl daemon-reload && sudo systemctl restart kubelet
+kubelet --version  # should be v1.31.x
+
+# 5) Hold again and uncordon
+sudo apt-mark hold kubeadm kubelet kubectl
+kubectl uncordon "$NODE"
+
+# 6) Verify
+kubectl get nodes -o wide
