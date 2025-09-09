@@ -1,0 +1,34 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: myapp-v2
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: myapp
+      version: v2
+  template:
+    metadata:
+      labels:
+        app: myapp
+        version: v2
+    spec:
+      containers:
+      - name: app
+        image: nginx:1.21
+        volumeMounts:
+        - name: html
+          mountPath: /usr/share/nginx/html
+      volumes:
+      - name: html
+        configMap:
+          name: myapp-v2-html
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: myapp-v2-html
+data:
+  index.html: |
+    <html><body><h1>🔥🔥🔥 MyApp - Version 2 (Canary)</h1></body></html>

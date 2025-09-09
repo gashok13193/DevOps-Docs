@@ -1,0 +1,9 @@
+curl -L https://istio.io/downloadIstio | sh -
+cd istio-1.*
+export PATH=$PWD/bin:$PATH
+
+# Install Istio (demo profile = good for labs)
+istioctl install --set profile=demo -y
+
+# Enable automatic sidecar injection in default namespace
+kubectl label namespace default istio-injection=enabled
