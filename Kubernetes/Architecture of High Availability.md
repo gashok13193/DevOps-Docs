@@ -4,7 +4,7 @@
 
 ## 1. Goal
 
-**Goal:** Design and demo a production-grade, highly‑available 3‑tier
+**Goal:** Design  a production-grade, highly‑available 3‑tier
 application running on Kubernetes. Show architecture, reliability
 patterns, deployment manifests/Helm, CI/CD (GitOps), failure scenarios
 
