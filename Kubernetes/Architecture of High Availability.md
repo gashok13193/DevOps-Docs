@@ -1,4 +1,4 @@
-# High-Availability 3‑Tier System on Kubernetes --- Design 
+# Design High-Availability of a 3‑Tier System on Kubernetes
 
 ------------------------------------------------------------------------
 
