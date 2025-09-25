@@ -50,20 +50,13 @@ Supporting components:
 I recommend either a single umbrella chart with 3 subcharts or three independent charts for lifecycle flexibility.
 
 charts/
-
-3tier-umbrella/
-
-Chart.yaml
-
-values.yaml
-
-charts/
-
-frontend/
-
-backend/
-
-database/
+└── 3tier-umbrella/
+    ├── Chart.yaml
+    ├── values.yaml
+    └── charts/
+        ├── frontend/
+        ├── backend/
+        └── database/
 
 Each subchart contains `templates/deployment.yaml`, `service.yaml`, `hpa.yaml` (frontend/backend), and `pdb.yaml`.
 
@@ -74,192 +67,102 @@ Each subchart contains `templates/deployment.yaml`, `service.yaml`, `hpa.yaml` (
 ### Frontend Deployment (stateless)
 
 apiVersion: apps/v1
-
 kind: Deployment
-
 metadata:
-
-name: frontend
-
-labels:
-
-app: frontend
-
+  name: frontend
+  labels:
+    app: frontend
 spec:
-
-replicas: 3
-
-selector:
-
-matchLabels:
-
-app: frontend
-
-template:
-
-metadata:
-
-labels:
-
-app: frontend
-
-spec:
-
-affinity:
-
-podAntiAffinity:
-
-preferredDuringSchedulingIgnoredDuringExecution:
-
-- weight: 100
-
-podAffinityTerm:
-
-labelSelector:
-
-matchLabels:
-
-app: frontend
-
-topologyKey: kubernetes.io/hostname
-
-containers:
-
-- name: frontend
-
-image: nginx:stable
-
-ports:
-
-- containerPort: 80
-
-readinessProbe:
-
-httpGet:
-
-path: /
-
-port: 80
-
-initialDelaySeconds: 5
-
-periodSeconds: 5
-
-livenessProbe:
-
-httpGet:
-
-path: /health
-
-port: 80
-
-initialDelaySeconds: 15
-
-periodSeconds: 20
+  replicas: 3
+  selector:
+    matchLabels:
+      app: frontend
+  template:
+    metadata:
+      labels:
+        app: frontend
+    spec:
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchLabels:
+                    app: frontend
+                topologyKey: kubernetes.io/hostname # Spreads pods across different nodes
+      containers:
+        - name: frontend
+          image: nginx:stable
+          ports:
+            - containerPort: 80
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 80
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 80
+            initialDelaySeconds: 15
+            periodSeconds: 20
 
 ### Backend Deployment (stateless)
 
 apiVersion: apps/v1
-
 kind: Deployment
-
 metadata:
-
-name: backend
-
-labels:
-
-app: backend
-
+  name: backend
+  labels:
+    app: backend
 spec:
-
-replicas: 3
-
-selector:
-
-matchLabels:
-
-app: backend
-
-template:
-
-metadata:
-
-labels:
-
-app: backend
-
-spec:
-
-containers:
-
-- name: backend
-
-image: your-registry/your-backend:latest
-
-ports:
-
-- containerPort: 8080
-
-env:
-
-- name: DATABASE_URL
-
-valueFrom:
-
-secretKeyRef:
-
-name: db-creds
-
-key: DATABASE_URL
-
-readinessProbe:
-
-httpGet:
-
-path: /ready
-
-port: 8080
-
-initialDelaySeconds: 3
-
-periodSeconds: 5
-
-livenessProbe:
-
-httpGet:
-
-path: /health
-
-port: 8080
-
-initialDelaySeconds: 15
-
-periodSeconds: 20
-
+  replicas: 3
+  selector:
+    matchLabels:
+      app: backend
+  template:
+    metadata:
+      labels:
+        app: backend
+    spec:
+      containers:
+        - name: backend
+          image: your-registry/your-backend:latest # Placeholder image
+          ports:
+            - containerPort: 8080
+          env:
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: db-creds # Name of the Kubernetes Secret
+                  key: DATABASE_URL # Key within the Secret
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: 8080
+            initialDelaySeconds: 3
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 15
+            periodSeconds: 20
 ### Backend Service
 
 apiVersion: v1
-
 kind: Service
-
 metadata:
-
-name: backend
-
+  name: backend
 spec:
-
-selector:
-
-app: backend
-
-ports:
-
-- port: 80
-
-targetPort: 8080
-
-type: ClusterIP
+  selector:
+    app: backend # Targets pods with the label app: backend
+  ports:
+    - port: 80 # The port the service exposes (internal to the cluster)
+      targetPort: 8080 # The port the container is listening on
+  type: ClusterIP # Only accessible from within the Kubernetes cluster
 
 ---
 
@@ -268,78 +171,42 @@ type: ClusterIP
 For production, use a DB operator (Patroni, Crunchy, Zalando Postgres Operator) — here’s a simple StatefulSet sample for demo only:
 
 apiVersion: apps/v1
-
 kind: StatefulSet
-
 metadata:
-
-name: postgres
-
+  name: postgres
 spec:
-
-serviceName: postgres
-
-replicas: 2
-
-selector:
-
-matchLabels:
-
-app: postgres
-
-template:
-
-metadata:
-
-labels:
-
-app: postgres
-
-spec:
-
-containers:
-
-- name: postgres
-
-image: postgres:15
-
-ports:
-
-- containerPort: 5432
-
-env:
-
-- name: POSTGRES_PASSWORD
-
-valueFrom:
-
-secretKeyRef:
-
-name: postgres-secret
-
-key: password
-
-volumeMounts:
-
-- name: pgdata
-
-mountPath: /var/lib/postgresql/data
-
-volumeClaimTemplates:
-
-- metadata:
-
-name: pgdata
-
-spec:
-
-accessModes: [ "ReadWriteOnce" ]
-
-resources:
-
-requests:
-
-storage: 20Gi
+  serviceName: postgres # Headless Service name for network identity
+  replicas: 2
+  selector:
+    matchLabels:
+      app: postgres
+  template:
+    metadata:
+      labels:
+        app: postgres
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:15
+          ports:
+            - containerPort: 5432
+          env:
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-secret # Retrieves password from this Secret
+                  key: password
+          volumeMounts:
+            - name: pgdata # Must match the name in volumeClaimTemplates
+              mountPath: /var/lib/postgresql/data # Default PostgreSQL data path
+  volumeClaimTemplates:
+    - metadata:
+        name: pgdata
+      spec:
+        accessModes: [ "ReadWriteOnce" ]
+        resources:
+          requests:
+            storage: 20Gi # Request 20Gi of persistent storage for each replica
 
 **Important:** This simple StatefulSet does not provide automatic leader election/replication — use an operator for production.
 
@@ -455,5 +322,3 @@ Show Grafana dashboards and logs to explain detection & remediation.
 - Simple alert: high 5xx rate ➜ Alertmanager webhook ➜ Slack.
 
 ---
-
-##
