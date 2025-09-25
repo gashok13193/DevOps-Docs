@@ -250,7 +250,7 @@ spec:
 
 ---
 
-## 9. GitOps & CI/CD (demo path)
+## 9. GitOps & CI/CD 
 
 - Push Helm charts to `git` (repo: `infrastructure/3tier`).
 - Use **ArgoCD** to watch repo and sync to cluster.
@@ -260,13 +260,13 @@ spec:
 
 ## 10. Demo setup options (choose one)
 
-**A. Local quick demo (fast to record)**
+**A. Local **
 
 - Use `k3d` or `minikube` + `ingress` addon + `helm`.
 - Use `MetalLB` for LoadBalancer simulation.
 - Deploy the manifests above and show services, pods, logs.
 
-**B. Cloud demo (more realistic)**
+**B. Cloud **
 
 - Use a managed cluster (EKS/GKE/AKS).
 - Show real LB and DNS via a subdomain.
@@ -274,67 +274,7 @@ spec:
 
 ---
 
-## 11. Live demo checklist & commands
-
-**Prereqs:** kubectl, helm, git, k3d/minikube or cloud CLI
-
-Commands (local quick demo):
-
-# create cluster (k3d example)
-
-k3d cluster create 3tier --agents 3
-
-kubectl create ns demo
-
-helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
-
-helm install ingress nginx-ingress/ingress-nginx -n demo
-
-# apply backend and frontend
-
-kubectl apply -f manifests/frontend-deployment.yaml -n demo
-
-kubectl apply -f manifests/backend-deployment.yaml -n demo
-
-kubectl apply -f manifests/backend-service.yaml -n demo
-
-# create a simple ingress
-
-kubectl apply -f manifests/ingress.yaml -n demo
-
-# check
-
-kubectl get pods -n demo
-
-kubectl get svc -n demo
-
-kubectl logs -l app=backend -n demo -f
-
-**Smoke test**
-
-kubectl run -i --rm load-generator --restart=Never --image=radial/busyboxplus:curl -n demo -- /bin/sh -c "for i in \$(seq 1 20); do curl -sS http://<ingress-ip>/api/health; sleep 1; done"
-
-**Load test** (hey)
-
-# Install hey: https://github.com/rakyll/hey
-
-hey -z 60s -q 50 -c 200 http://<ingress-ip>/api/endpoint
-
----
-
-## 12. Failure & resilience demos to record
-
-1. **Kill a backend pod** while showing readiness and replacing.
-2. **Simulate node outage** (cordon + drain one node) and show migration.
-3. **Remove a replica of DB** and show failover (if operator used).
-4. **NetworkPolicy blocking** — show how requests fail then restore.
-5. **Simulate high traffic** and show autoscaling.
-
-Show Grafana dashboards and logs to explain detection & remediation.
-
----
-
-## 13. Monitoring & alerts (quick)
+## 11. Monitoring & alerts
 
 - Prometheus scrape targets: kube-state-metrics, node-exporter, app metrics.
 - Create Grafana dashboards for requests/success rates/latency/DB connections.
