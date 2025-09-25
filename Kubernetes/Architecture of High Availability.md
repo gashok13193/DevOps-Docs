@@ -1,71 +1,86 @@
-# High-Availability 3‑Tier System on Kubernetes — Design
+# High-Availability 3‑Tier System on Kubernetes --- Design 
 
-
+------------------------------------------------------------------------
 
 ## 1. Goal
-**Goal:** Design  a production-grade, highly‑available 3‑tier application running on Kubernetes. Show architecture, reliability patterns, deployment manifests/Helm, CI/CD (GitOps), failure scenarios, and a live demo with load tests.
 
-**Audience:** DevOps engineers, SREs, platform engineers, intermediate Kubernetes users.
+**Goal:** Design and demo a production-grade, highly‑available 3‑tier
+application running on Kubernetes. Show architecture, reliability
+patterns, deployment manifests/Helm, CI/CD (GitOps), failure scenarios
 
----
+**Audience:** DevOps engineers, SREs, platform engineers, intermediate
+Kubernetes users.
 
-## 2. Architecture
+------------------------------------------------------------------------
+
+## 2. Architecture (summary)
 
 3 tiers:
 
-1. **Frontend (Presentation layer)** — static or dynamic web server (e.g., NGINX or Node.js), served via an Ingress/LoadBalancer with HTTPS.
-2. **Backend (Application layer / API)** — stateless app (e.g., Python/Go/Node microservice) behind a Kubernetes Service and horizontal autoscaling.
-3. **Database (Data layer)** — stateful DB (Postgres/MySQL) using StatefulSet with persistent volumes and synchronous replication (primary + replicas).
+1.  **Frontend (Presentation layer)** --- static or dynamic web server
+    (e.g., NGINX or Node.js), served via an Ingress/LoadBalancer with
+    HTTPS.
+2.  **Backend (Application layer / API)** --- stateless app (e.g.,
+    Python/Go/Node microservice) behind a Kubernetes Service and
+    horizontal autoscaling.
+3.  **Database (Data layer)** --- stateful DB (Postgres/MySQL) using
+    StatefulSet with persistent volumes and synchronous replication
+    (primary + replicas).
 
 Supporting components:
 
-- Ingress controller (NGINX Ingress or Traefik) + cert-manager for TLS.
-- External load balancer (cloud) or MetalLB for on-prem.
-- Prometheus + Grafana for monitoring, and Alertmanager.
-- Fluentd/Vector + Loki or Splunk for logging.
-- ArgoCD (GitOps) for deployments.
-- Optional service mesh (Istio/Linkerd) for mTLS/traffic control.
+-   Ingress controller (NGINX Ingress or Traefik) + cert-manager for
+    TLS.
+-   External load balancer (cloud) or MetalLB for on-prem.
+-   Prometheus + Grafana for monitoring, and Alertmanager.
+-   Fluentd/Vector + Loki or Splunk for logging.
+-   ArgoCD (GitOps) for deployments.
+-   Optional service mesh (Istio/Linkerd) for mTLS/traffic control.
 
 **HA patterns**
 
-- Multiple replicas per tier (>=3 for frontend/backend).
-- Pod anti-affinity across nodes and AZs.
-- PodDisruptionBudgets and readiness/liveness probes.
-- StatefulSet with at least 1 replica for primary + replicas (or use operator like Patroni/Crunchy/Postgres Operator).
-- Use StorageClass with replication or multi-AZ storage.
-- Backup with Velero.
+-   Multiple replicas per tier (\>=3 for frontend/backend).
+-   Pod anti-affinity across nodes and AZs.
+-   PodDisruptionBudgets and readiness/liveness probes.
+-   StatefulSet with at least 1 replica for primary + replicas (or use
+    operator like Patroni/Crunchy/Postgres Operator).
+-   Use StorageClass with replication or multi-AZ storage.
+-   Backup with Velero.
 
----
+------------------------------------------------------------------------
 
 ## 3. Recommended topology (cloud example)
 
-- 3 worker nodes across 2-3 AZs (or more).
-- Control plane managed (EKS/GKE/AKS) or HA control plane for on-prem.
-- NodePools: small, medium, db (larger storage/IO).
+-   3 worker nodes across 2-3 AZs (or more).
+-   Control plane managed (EKS/GKE/AKS) or HA control plane for on-prem.
+-   NodePools: small, medium, db (larger storage/IO).
 
----
+------------------------------------------------------------------------
 
 ## 4. Helm chart layout (single umbrella or 3 charts)
 
-I recommend either a single umbrella chart with 3 subcharts or three independent charts for lifecycle flexibility.
+I recommend either a single umbrella chart with 3 subcharts or three
+independent charts for lifecycle flexibility.
 
-charts/
-└── 3tier-umbrella/
-    ├── Chart.yaml
-    ├── values.yaml
-    └── charts/
-        ├── frontend/
-        ├── backend/
-        └── database/
+    charts/
+      3tier-umbrella/
+        Chart.yaml
+        values.yaml
+        charts/
+          frontend/
+          backend/
+          database/
 
-Each subchart contains `templates/deployment.yaml`, `service.yaml`, `hpa.yaml` (frontend/backend), and `pdb.yaml`.
+Each subchart contains `templates/deployment.yaml`, `service.yaml`,
+`hpa.yaml` (frontend/backend), and `pdb.yaml`.
 
----
+------------------------------------------------------------------------
 
-## 5. Minimal Kubernetes manifests (copyable) — frontend and backend
+## 5. Minimal Kubernetes manifests (copyable) --- frontend and backend
 
 ### Frontend Deployment (stateless)
 
+``` yaml
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -90,7 +105,7 @@ spec:
                 labelSelector:
                   matchLabels:
                     app: frontend
-                topologyKey: kubernetes.io/hostname # Spreads pods across different nodes
+                topologyKey: kubernetes.io/hostname
       containers:
         - name: frontend
           image: nginx:stable
@@ -108,9 +123,11 @@ spec:
               port: 80
             initialDelaySeconds: 15
             periodSeconds: 20
+```
 
 ### Backend Deployment (stateless)
 
+``` yaml
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -129,15 +146,15 @@ spec:
     spec:
       containers:
         - name: backend
-          image: your-registry/your-backend:latest # Placeholder image
+          image: your-registry/your-backend:latest
           ports:
             - containerPort: 8080
           env:
             - name: DATABASE_URL
               valueFrom:
                 secretKeyRef:
-                  name: db-creds # Name of the Kubernetes Secret
-                  key: DATABASE_URL # Key within the Secret
+                  name: db-creds
+                  key: DATABASE_URL
           readinessProbe:
             httpGet:
               path: /ready
@@ -150,26 +167,28 @@ spec:
               port: 8080
             initialDelaySeconds: 15
             periodSeconds: 20
+```
+
 ### Backend Service
 
+``` yaml
 apiVersion: v1
 kind: Service
 metadata:
   name: backend
 spec:
   selector:
-    app: backend # Targets pods with the label app: backend
+    app: backend
   ports:
-    - port: 80 # The port the service exposes (internal to the cluster)
-      targetPort: 8080 # The port the container is listening on
-  type: ClusterIP # Only accessible from within the Kubernetes cluster
-
----
+    - port: 80
+      targetPort: 8080
+  type: ClusterIP
+```
 
 ## 6. Database (stateful) — Postgres StatefulSet snippet
 
 For production, use a DB operator (Patroni, Crunchy, Zalando Postgres Operator) — here’s a simple StatefulSet sample for demo only:
-
+``` yaml
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
@@ -207,7 +226,7 @@ spec:
         resources:
           requests:
             storage: 20Gi # Request 20Gi of persistent storage for each replica
-
+```
 **Important:** This simple StatefulSet does not provide automatic leader election/replication — use an operator for production.
 
 ---
