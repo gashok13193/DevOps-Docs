@@ -168,7 +168,8 @@ Docker networks allow containers to communicate with each other or the host mach
         
         ```bash
         
-        docker run --network none <image>
+        docker run -d --name nginx_none --network none nginx
+
         
         ```
         
