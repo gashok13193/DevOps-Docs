@@ -226,7 +226,7 @@ Docker volumes persist data beyond the container lifecycle, making them essentia
         
         ```bash
         
-        docker run -d --name my_container -v /host/path:/container/path nginx
+        docker run -d --name my_container -v /root:/tmp nginx
         
         ```
         
