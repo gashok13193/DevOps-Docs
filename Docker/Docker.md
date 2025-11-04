@@ -399,7 +399,7 @@ CMD ["python", "app.py"]
 
 `docker rmi $(docker images -q)`
 
-🧩 Docker Compose File (YAML only)
+## 🧩 Docker Compose File (YAML only)
 
 This example runs two containers:
 
@@ -407,7 +407,7 @@ nginx (web server)
 
 redis (database)
 
-📄 docker-compose.yml
+## 📄 docker-compose.yml
 
 version: "3.9"
 
@@ -435,7 +435,7 @@ networks:
     driver: bridge
 
 
-📘 What it does
+# 📘 What it does
 
 Runs NGINX web server on port 8080
 
@@ -447,28 +447,30 @@ Mounts ./html folder from your host to /usr/share/nginx/html in the container
 → You can create an index.html inside ./html to show a custom page.
 
 💻 Docker Compose Commands for Demo
-🧱 1️⃣ Build and start all services
+
+# 🧱 1️⃣ Build and start all services
+
 docker compose up -d
 
 
 ✅ Runs containers in background (-d = detached mode)
 
-🧾 2️⃣ View running containers
+# 🧾 2️⃣ View running containers
 docker compose ps
 
-📜 3️⃣ View container logs (real-time)
+# 📜 3️⃣ View container logs (real-time)
 docker compose logs -f
 
-🔍 4️⃣ Check logs of a single service
+# 🔍 4️⃣ Check logs of a single service
 docker compose logs web
 
-🧠 5️⃣ Execute command inside container
+# 🧠 5️⃣ Execute command inside container
 docker compose exec web ls /usr/share/nginx/html
 
-🧩 6️⃣ Stop containers (without removing)
+# 🧩 6️⃣ Stop containers (without removing)
 docker compose stop
 
-🧹 7️⃣ Remove containers, networks, volumes
+# 🧹 7️⃣ Remove containers, networks, volumes
 docker compose down
 
 🔄 8️⃣ Restart services
