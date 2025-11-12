@@ -263,7 +263,7 @@ sudo mv apache-maven-3.9.11 /opt/
 Add the following lines to the user profile file (.profile).
 
 ```
-M2_HOME='/opt/apache-maven-3.9.9'
+M2_HOME='/opt/apache-maven-3.9.11'
 PATH="$M2_HOME/bin:$PATH"
 export PATH
 
