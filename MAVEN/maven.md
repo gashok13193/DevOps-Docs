@@ -252,9 +252,9 @@ Go to the URL: https://maven.apache.org/download.cgi Copy the link for the “
 ### [Step 1: Download the Maven Binaries](https://www.digitalocean.com/community/tutorials/install-maven-linux-ubuntu#step-1-download-the-maven-binaries)
 
 ```
-wget https://dlcdn.apache.org/maven/maven-3/3.9.9/binaries/apache-maven-3.9.9-bin.tar.gz --no-check-certificate
-tar -xvf apache-maven-3.9.9-bin.tar.gz
-sudo mv apache-maven-3.9.9 /opt/
+wget https://dlcdn.apache.org/maven/maven-3/3.9.11/binaries/apache-maven-3.9.11-bin.tar.gz
+tar -xvf apache-maven-3.9.11-bin.tar.gz
+sudo mv apache-maven-3.9.11 /opt/
 
 ```
 
