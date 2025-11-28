@@ -102,7 +102,7 @@ spec:
         args:
           - "-text=hello"
         ports:
-        - containerPort: 8080
+        - containerPort: 5678
 ```
 
 ```yaml
@@ -116,6 +116,6 @@ spec:
   ports:
   - protocol: TCP
     port: 80
-    targetPort: 9090
+    targetPort: 5678
   type: ClusterIP
 ```
