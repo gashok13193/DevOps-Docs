@@ -105,3 +105,17 @@ spec:
         - containerPort: 8080
 ```
 
+```yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: web-svc
+spec:
+  selector:
+    app: web
+  ports:
+  - protocol: TCP
+    port: 80
+    targetPort: 9090
+  type: ClusterIP
+```
