@@ -1,4 +1,4 @@
-#                                                       DEVOPS ARCHITECTURE FOR PRODUCTION
+#                                                       DESIGN KUBERNETES FOR PRODUCTION
 
 ## 0 — Prerequisites 
 
