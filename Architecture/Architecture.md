@@ -1,4 +1,4 @@
-0 — Prerequisites 
+## 0 — Prerequisites 
 
 What to have ready:
 
@@ -8,9 +8,8 @@ Terraform / Cloud CLI installed. kubectl, helm, jq, and a Git repo (GitHub/GitLa
 
 An SRE/Platform runbook document and owner for the cluster.
 
-Demo tip: show a short slide listing prerequisites.
 
-1 — Set up foundational networking & IAM (VPC / subnets / routes / NAT / security groups / roles)
+## 1 — Set up foundational networking & IAM (VPC / subnets / routes / NAT / security groups / roles)
 
 What: VPC with 3 AZ subnets (private for nodes), public LB subnets, NAT gateway, route tables; IAM roles for cluster and node pools.
 Why: Multi-AZ networking is the foundation — ensures availability and correct security boundaries. IAM roles give least-privilege automation for node/cluster actions.
@@ -40,7 +39,7 @@ Wrong route tables → nodes cannot reach internet for image pulls. Fix: check r
 Missing IAM policies → cluster creation fails. Fix: attach required managed policies.
 
 
-2 — Provision the Kubernetes control plane (managed or self-hosted) and bootstrap cluster
+## 2 — Provision the Kubernetes control plane (managed or self-hosted) and bootstrap cluster
 
 What: Create cluster (EKS/GKE/AKS or kubeadm). Create initial admin kubeconfig.
 
@@ -74,7 +73,7 @@ Control plane subnet in public vs private causing security issues — ensure con
 API server role error — fix IAM trust relationship.
 
 
-3 — Create Node Pools / Node Groups (general, spot/preemptible, GPU, storage-optimized)
+## 3 — Create Node Pools / Node Groups (general, spot/preemptible, GPU, storage-optimized)
 
 What: Multiple node pools with labels & taints:
 
@@ -105,7 +104,7 @@ GPU driver missing → GPU pods stuck. Install NVIDIA device plugin daemonset.
 Spot nodes evicted unexpectedly — ensure workloads tolerate interruption.
 
 
-4 — Install CNI & baseline Network Policies (Calico or Cilium)
+## 4 — Install CNI & baseline Network Policies (Calico or Cilium)
 
 What: CNI plugin + default deny network policies (baseline allow rules).
 
@@ -150,7 +149,7 @@ CNI conflicting with cloud-provided CNI — pick one and follow provider docs.
 Default deny breaks control plane connections — ensure necessary allow policies for kube-dns, kubelet.
 
 
-5 — Install cert-manager (automated TLS)
+## 5 — Install cert-manager (automated TLS)
 
 What: cert-manager with ClusterIssuer (ACME/LetsEncrypt or internal CA).
 
@@ -199,7 +198,7 @@ Rate limits with Let's Encrypt production — use staging for testing.
 Missing ingress class mismatch — use correct ingressClassName.
 
 
-6 — Install Ingress Controller (nginx / cloud LB) and expose an example app
+## 6 — Install Ingress Controller (nginx / cloud LB) and expose an example app
 
 What: NGINX ingress controller or cloud-provider LB with Ingress support.
 
@@ -255,7 +254,7 @@ Ingress controller pending external IP — attach correct cloud LB permissions.
 Host DNS not pointing to LB — use test host entry for demo.
 
 
-7 — Install GitOps (ArgoCD) & connect to Git
+## 7 — Install GitOps (ArgoCD) & connect to Git
 
 What: ArgoCD for declarative continuous delivery (App-of-Apps pattern recommended).
 
@@ -305,7 +304,7 @@ RBAC misconfiguration — ensure Argo has permissions for target namespaces.
 Secret management — do not store plain secrets in Git.
 
 
-8 — Install Observability: Prometheus (metrics) + Grafana + Alertmanager
+## 8 — Install Observability: Prometheus (metrics) + Grafana + Alertmanager
 
 What: kube-prometheus-stack (Prometheus Operator) and Grafana.
 
@@ -333,7 +332,7 @@ High cardinality metrics → performance issues. Use relabeling to drop noisy la
 Storage retention too small — configure remote-write to long-term storage.
 
 
-9 — Install Log Collection: FluentBit / Vector → central log store (Splunk/ELK)
+## 9 — Install Log Collection: FluentBit / Vector → central log store (Splunk/ELK)
 
 What: Daemonset forwarder to ship logs to Splunk HEC / Elasticsearch / Logstash.
 
@@ -363,7 +362,7 @@ Lack of parsing → unstructured logs. Use parsers and structured JSON logging a
 Log volume costs — configure sampling or tail only necessary logs.
 
 
-10 — Deploy Service Mesh (Linkerd or Istio) — phased rollout
+## 10 — Deploy Service Mesh (Linkerd or Istio) — phased rollout
 
 What: Install Linkerd (simpler) or Istio (full-featured) and enable sidecar injection selectively.
 
@@ -394,7 +393,7 @@ Increased resource usage by sidecars — monitor resource overhead.
 Complex policies in Istio — roll out gradually.
 
 
-11 — Deploy Stateful Systems via Operators (Strimzi for Kafka, Postgres operator)
+## 11 — Deploy Stateful Systems via Operators (Strimzi for Kafka, Postgres operator)
 
 What: Operators (like Strimzi) manage StatefulSets, PVCs, and scaling for data platforms.
 
@@ -425,7 +424,7 @@ PVCs bound to specific AZ and pod scheduling fails — use topology affinity and
 JVM tuning and disk I/O must be monitored.
 
 
-12 — Secrets Management (Vault + CSI Secrets Store)
+## 12 — Secrets Management (Vault + CSI Secrets Store)
 
 What: Vault or Cloud KMS with CSI Secrets Store to inject secrets into pods as files or env vars.
 
@@ -450,7 +449,7 @@ Pitfalls & fixes:
 Kubernetes service account not configured for Vault auth — configure proper approle or k8s auth method.
 
 
-13 — Autoscaling (HPA, VPA, Cluster Autoscaler)
+## 13 — Autoscaling (HPA, VPA, Cluster Autoscaler)
 
 What: Horizontal Pod Autoscaler (HPA), Vertical Pod Autoscaler (VPA), Cluster Autoscaler for nodes.
 
@@ -486,7 +485,7 @@ Incorrect metrics-server permissions → HPA won't scale. Check API aggregation 
 Scale-down thrash — tune cooldowns.
 
 
-14 — Security Controls & Policy Enforcement (RBAC, Pod Security, OPA/Gatekeeper)
+## 14 — Security Controls & Policy Enforcement (RBAC, Pod Security, OPA/Gatekeeper)
 
 What: RBAC hardening, PSP replacement (Pod Security Admission), OPA/Gatekeeper for policies.
 
@@ -509,7 +508,7 @@ Pitfalls & fixes:
 Overly strict policies break legitimate apps — audit and adopt progressively.
 
 
-15 — Backup & Disaster Recovery (Velero + PV snapshots)
+## 15 — Backup & Disaster Recovery (Velero + PV snapshots)
 
 What: Velero for cluster object backups and snapshot integration for PVs.
 
@@ -540,7 +539,7 @@ Snapshot provider compatibility — ensure CSI snapshots are supported.
 Consistency for databases — use app-level backups for DBs (e.g., `pg_dump`) in addition to PV snapshots.
 
 
-16 — Chaos Engineering & Runbooks (Drills)
+## 16 — Chaos Engineering & Runbooks (Drills)
 
 What: Runbooks for common incidents (pod crash, node failure, PV loss) + chaos experiments (Chaos Mesh/Gremlin).
 
@@ -561,7 +560,7 @@ Pitfalls & fixes:
 Unplanned cascading failures — always run chaos on a non-production or well-scoped segment.
 
 
-17 — Cost Governance & Observability for Platform
+## 17 — Cost Governance & Observability for Platform
 
 What: Export cost metrics (cloud cost exporter), enforce `ResourceQuota` and `LimitRanges` per namespace.
 
@@ -596,7 +595,7 @@ Pitfalls & fixes:
 Hard quotas block legitimate burst workloads — set quotas with headroom.
 
 
-18 — Day 2 Ops: upgrades, backups, maintenance windows, and runbook testing
+## 18 — Day 2 Ops: upgrades, backups, maintenance windows, and runbook testing
 
 What: Documented upgrade process, daily/weekly maintenance (etcd backups, control plane patches), and scheduled DR drills.
 
@@ -619,7 +618,7 @@ Pitfalls & fixes:
 Skipping PDBs can cause app downtime during upgrades — set PDBs for critical components.
 
 
-19 — Observability & SLOs: Define SLIs, SLOs, Alerts & Runbooks
+## 19 — Observability & SLOs: Define SLIs, SLOs, Alerts & Runbooks
 
 What: Meaningful SLIs (latency, error rate), SLO targets, and alerting rules in Prometheus/Alertmanager with clear runbooks.
 
@@ -652,7 +651,7 @@ Pitfalls & fixes:
 Alert fatigue — tune thresholds and use alert routing for severity.
 
 
-20 — Deliverables & Repo (finalize)
+## 20 — Deliverables & Repo (finalize)
 
 What: GitHub repo with:
 
