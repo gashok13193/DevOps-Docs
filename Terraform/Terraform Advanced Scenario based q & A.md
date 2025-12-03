@@ -1,8 +1,6 @@
 ## Terraform Advanced Scenario-Based Questions & Answers (2025)
 
-These are real-world, production-grade Terraform scenarios with concise, practical answers.
 
----
 
 ### 1. Two developers run `terraform apply` on the same module at the same time. What happens and how do you prevent state corruption?
 
