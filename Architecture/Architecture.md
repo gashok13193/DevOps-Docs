@@ -1,6 +1,6 @@
 ## 0 — Prerequisites 
 
-What to have ready:
+**What to have ready:**
 
 Cloud account (AWS/GCP/Azure) or on-prem infra. Decide managed (EKS/GKE/AKS) vs self-hosted (kubeadm/kubespray). Recommendation: managed (EKS/GKE/AKS) for production unless you need full control.
 
@@ -11,10 +11,10 @@ An SRE/Platform runbook document and owner for the cluster.
 
 ## 1 — Set up foundational networking & IAM (VPC / subnets / routes / NAT / security groups / roles)
 
-What: VPC with 3 AZ subnets (private for nodes), public LB subnets, NAT gateway, route tables; IAM roles for cluster and node pools.
-Why: Multi-AZ networking is the foundation — ensures availability and correct security boundaries. IAM roles give least-privilege automation for node/cluster actions.
+**What:** VPC with 3 AZ subnets (private for nodes), public LB subnets, NAT gateway, route tables; IAM roles for cluster and node pools.
+**Why:** Multi-AZ networking is the foundation — ensures availability and correct security boundaries. IAM roles give least-privilege automation for node/cluster actions.
 
-How (example: Terraform / AWS):
+**How (example: Terraform / AWS):**
 
 Terraform VPC module to create:
 
@@ -26,13 +26,13 @@ NAT gateway(s) or NAT gateway per AZ for high availability
 
 Create IAM roles: eks-cluster-role, eks-node-role with least privilege policies.
 
-Verify:
+**Verify:**
 
 Confirm 3 AZs are available and subnets are created. aws ec2 describe-subnets --filters ...
 
 Show topology diagram or terraform show.
 
-Pitfalls & fixes:
+**Pitfalls & fixes:**
 
 Wrong route tables → nodes cannot reach internet for image pulls. Fix: check route table associations.
 
@@ -41,11 +41,11 @@ Missing IAM policies → cluster creation fails. Fix: attach required managed po
 
 ## 2 — Provision the Kubernetes control plane (managed or self-hosted) and bootstrap cluster
 
-What: Create cluster (EKS/GKE/AKS or kubeadm). Create initial admin kubeconfig.
+**What:** Create cluster (EKS/GKE/AKS or kubeadm). Create initial admin kubeconfig.
 
-Why: Cluster is the central control plane. Managed control planes are recommended for production (automated upgrades, HA, etc.)
+**Why:** Cluster is the central control plane. Managed control planes are recommended for production (automated upgrades, HA, etc.)
 
-How:
+**How:**
 
 EKS (eksctl quick example):
 
@@ -58,7 +58,7 @@ eksctl create cluster --name prod-cluster \
 
 Or Terraform aws_eks_cluster module for IaC.
 
-Verify:
+**Verify:**
 
 ```bash
 kubectl get nodes
@@ -66,7 +66,7 @@ kubectl get cs # componentstatuses
 kubectl get pods -n kube-system
 ```
 
-Pitfalls & fixes:
+**Pitfalls & fixes:**
 
 Control plane subnet in public vs private causing security issues — ensure control plane subnets are private.
 
@@ -75,29 +75,29 @@ API server role error — fix IAM trust relationship.
 
 ## 3 — Create Node Pools / Node Groups (general, spot/preemptible, GPU, storage-optimized)
 
-What: Multiple node pools with labels & taints:
+**What:** Multiple node pools with labels & taints:
 
 - node-role=general (on-demand)
 - node-role=spot (spot/preemptible, with tolerations)
 - node-role=gpu (GPU workloads, with GPU drivers)
 - node-role=storage (high-IO)
 
-Why: Separation of workload types and cost optimization. Taints + tolerations enforce placement.
+**Why:** Separation of workload types and cost optimization. Taints + tolerations enforce placement.
 
-How:
+**How:**
 
 For EKS: create additional nodegroups with eksctl or Terraform aws_eks_node_group.
 
 Add labels/taints in nodegroup spec, e.g., `--node-labels node-role=general` or via AWS tags.
 
-Verify:
+**Verify:**
 
 ```bash
 kubectl get nodes --show-labels
 kubectl describe node <node> # check taints
 ```
 
-Pitfalls & fixes:
+**Pitfalls & fixes:**
 
 GPU driver missing → GPU pods stuck. Install NVIDIA device plugin daemonset.
 
@@ -106,11 +106,11 @@ Spot nodes evicted unexpectedly — ensure workloads tolerate interruption.
 
 ## 4 — Install CNI & baseline Network Policies (Calico or Cilium)
 
-What: CNI plugin + default deny network policies (baseline allow rules).
+**What:** CNI plugin + default deny network policies (baseline allow rules).
 
-Why: Provides pod networking, network policy enforcement, and optional eBPF observability (Cilium).
+**Why:** Provides pod networking, network policy enforcement, and optional eBPF observability (Cilium).
 
-How:
+**How:**
 
 Install Cilium (example Helm):
 
@@ -135,14 +135,14 @@ spec:
   - Egress
 ```
 
-Verify:
+**Verify:**
 
 ```bash
 kubectl get pods -n kube-system # cilium/calico pods running
 # Test connection between pods using kubectl exec (should be blocked until allow rules added).
 ```
 
-Pitfalls & fixes:
+**Pitfalls & fixes:**
 
 CNI conflicting with cloud-provided CNI — pick one and follow provider docs.
 
@@ -151,11 +151,11 @@ Default deny breaks control plane connections — ensure necessary allow policie
 
 ## 5 — Install cert-manager (automated TLS)
 
-What: cert-manager with ClusterIssuer (ACME/LetsEncrypt or internal CA).
+**What:** cert-manager with ClusterIssuer (ACME/LetsEncrypt or internal CA).
 
-Why: Auto-issue and renew TLS certs for Ingress and services.
+**Why:** Auto-issue and renew TLS certs for Ingress and services.
 
-How:
+**How:**
 
 ```bash
 kubectl create namespace cert-manager
@@ -184,14 +184,14 @@ spec:
           class: nginx
 ```
 
-Verify:
+**Verify:**
 
 ```bash
 kubectl get pods -n cert-manager
 # Create an Ingress with cert-manager.io/cluster-issuer: "letsencrypt-staging" and check certificate object.
 ```
 
-Pitfalls & fixes:
+**Pitfalls & fixes:**
 
 Rate limits with Let's Encrypt production — use staging for testing.
 
@@ -200,11 +200,11 @@ Missing ingress class mismatch — use correct ingressClassName.
 
 ## 6 — Install Ingress Controller (nginx / cloud LB) and expose an example app
 
-What: NGINX ingress controller or cloud-provider LB with Ingress support.
+**What:** NGINX ingress controller or cloud-provider LB with Ingress support.
 
-Why: Entry point for HTTP(S) traffic into the cluster with host/path routing and TLS termination.
+**Why:** Entry point for HTTP(S) traffic into the cluster with host/path routing and TLS termination.
 
-How:
+**How:**
 
 ```bash
 helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
@@ -240,14 +240,14 @@ spec:
     secretName: demo-tls
 ```
 
-Verify:
+**Verify:**
 
 ```bash
 kubectl get svc -n ingress-nginx # external IP
 curl http://<external-ip-or-host>
 ```
 
-Pitfalls & fixes:
+**Pitfalls & fixes:**
 
 Ingress controller pending external IP — attach correct cloud LB permissions.
 
@@ -256,11 +256,11 @@ Host DNS not pointing to LB — use test host entry for demo.
 
 ## 7 — Install GitOps (ArgoCD) & connect to Git
 
-What: ArgoCD for declarative continuous delivery (App-of-Apps pattern recommended).
+**What:** ArgoCD for declarative continuous delivery (App-of-Apps pattern recommended).
 
-Why: Provides auditable, automated deployments from Git; rollback & promotion are easy.
+**Why:** Provides auditable, automated deployments from Git; rollback & promotion are easy.
 
-How:
+**How:**
 
 ```bash
 kubectl create ns argocd
@@ -290,14 +290,14 @@ spec:
     automated: {}
 ```
 
-Verify:
+**Verify:**
 
 ```bash
 # ArgoCD UI shows apps and sync status.
 kubectl get apps -n argocd
 ```
 
-Pitfalls & fixes:
+**Pitfalls & fixes:**
 
 RBAC misconfiguration — ensure Argo has permissions for target namespaces.
 
@@ -306,11 +306,11 @@ Secret management — do not store plain secrets in Git.
 
 ## 8 — Install Observability: Prometheus (metrics) + Grafana + Alertmanager
 
-What: kube-prometheus-stack (Prometheus Operator) and Grafana.
+**What:** kube-prometheus-stack (Prometheus Operator) and Grafana.
 
-Why: Collect node / pod / app metrics, create dashboards and alerts (SLOs).
+**Why:** Collect node / pod / app metrics, create dashboards and alerts (SLOs).
 
-How:
+**How:**
 
 ```bash
 helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
@@ -318,14 +318,14 @@ helm repo update
 helm install monitoring prometheus-community/kube-prometheus-stack -n monitoring --create-namespace
 ```
 
-Verify:
+**Verify:**
 
 ```bash
 kubectl port-forward svc/prometheus-kube-prometheus-prometheus -n monitoring 9090:9090
 # Visit Prometheus UI; run basic query up or kube_pod_info.
 ```
 
-Pitfalls & fixes:
+**Pitfalls & fixes:**
 
 High cardinality metrics → performance issues. Use relabeling to drop noisy labels.
 
@@ -334,11 +334,11 @@ Storage retention too small — configure remote-write to long-term storage.
 
 ## 9 — Install Log Collection: FluentBit / Vector → central log store (Splunk/ELK)
 
-What: Daemonset forwarder to ship logs to Splunk HEC / Elasticsearch / Logstash.
+**What:** Daemonset forwarder to ship logs to Splunk HEC / Elasticsearch / Logstash.
 
-Why: Centralized logs for incident response and auditing.
+**Why:** Centralized logs for incident response and auditing.
 
-How (FluentBit example):
+**How (FluentBit example):**
 
 ```bash
 helm repo add fluent https://fluent.github.io/helm-charts
@@ -348,14 +348,14 @@ helm install fluent-bit fluent/fluent-bit -n logging --create-namespace \
   --set backend.http.tls=true --set backend.http.auth_token=<HEC_TOKEN>
 ```
 
-Verify:
+**Verify:**
 
 ```bash
 kubectl get pods -n logging
 # Check Splunk or ELK for received logs (search index=main | head 10)
 ```
 
-Pitfalls & fixes:
+**Pitfalls & fixes:**
 
 Lack of parsing → unstructured logs. Use parsers and structured JSON logging at app level.
 
@@ -364,11 +364,11 @@ Log volume costs — configure sampling or tail only necessary logs.
 
 ## 10 — Deploy Service Mesh (Linkerd or Istio) — phased rollout
 
-What: Install Linkerd (simpler) or Istio (full-featured) and enable sidecar injection selectively.
+**What:** Install Linkerd (simpler) or Istio (full-featured) and enable sidecar injection selectively.
 
-Why: Provides mTLS, telemetry, traffic shaping (canary), retries, circuit breaking.
+**Why:** Provides mTLS, telemetry, traffic shaping (canary), retries, circuit breaking.
 
-How (Linkerd quickstart):
+**How (Linkerd quickstart):**
 
 ```bash
 curl -sL https://run.linkerd.io/install | sh
@@ -378,7 +378,7 @@ linkerd check
 kubectl annotate namespace demo linkerd.io/inject=enabled
 ```
 
-Verify:
+**Verify:**
 
 ```bash
 linkerd viz install # for viz components
@@ -386,7 +386,7 @@ linkerd check
 kubectl get pods -n linkerd
 ```
 
-Pitfalls & fixes:
+**Pitfalls & fixes:**
 
 Increased resource usage by sidecars — monitor resource overhead.
 
@@ -395,11 +395,11 @@ Complex policies in Istio — roll out gradually.
 
 ## 11 — Deploy Stateful Systems via Operators (Strimzi for Kafka, Postgres operator)
 
-What: Operators (like Strimzi) manage StatefulSets, PVCs, and scaling for data platforms.
+**What:** Operators (like Strimzi) manage StatefulSets, PVCs, and scaling for data platforms.
 
-Why: Operators encode best practices and automate lifecycle for complex stateful systems.
+**Why:** Operators encode best practices and automate lifecycle for complex stateful systems.
 
-How (Strimzi quick):
+**How (Strimzi quick):**
 
 ```bash
 kubectl create ns kafka
@@ -410,14 +410,14 @@ kubectl apply -f kafka-cluster.yaml -n kafka
 
 `kafka-cluster.yaml` contains broker count, storage class, and listeners.
 
-Verify:
+**Verify:**
 
 ```bash
 kubectl get kafka -n kafka
 kubectl get pods,pvc -n kafka
 ```
 
-Pitfalls & fixes:
+**Pitfalls & fixes:**
 
 PVCs bound to specific AZ and pod scheduling fails — use topology affinity and multi-AZ storage or a storage class that supports multi-AZ snapshots.
 
@@ -426,11 +426,11 @@ JVM tuning and disk I/O must be monitored.
 
 ## 12 — Secrets Management (Vault + CSI Secrets Store)
 
-What: Vault or Cloud KMS with CSI Secrets Store to inject secrets into pods as files or env vars.
+**What:** Vault or Cloud KMS with CSI Secrets Store to inject secrets into pods as files or env vars.
 
-Why: Centralized secrets with rotation, audit logs, access policies.
+**Why:** Centralized secrets with rotation, audit logs, access policies.
 
-How (Vault + CSI quick):
+**How (Vault + CSI quick):**
 
 Install Vault (HA topology) or use managed secrets (AWS Secrets Manager).
 
@@ -438,24 +438,24 @@ Install CSI Secrets Store driver and provider for Vault/KMS.
 
 Create Kubernetes `SecretProviderClass` to map external secrets to pods.
 
-Verify:
+**Verify:**
 
 Deploy pod that mounts secret and read file.
 
 Check Vault audit logs.
 
-Pitfalls & fixes:
+**Pitfalls & fixes:**
 
 Kubernetes service account not configured for Vault auth — configure proper approle or k8s auth method.
 
 
 ## 13 — Autoscaling (HPA, VPA, Cluster Autoscaler)
 
-What: Horizontal Pod Autoscaler (HPA), Vertical Pod Autoscaler (VPA), Cluster Autoscaler for nodes.
+**What:** Horizontal Pod Autoscaler (HPA), Vertical Pod Autoscaler (VPA), Cluster Autoscaler for nodes.
 
-Why: Maintain performance while optimizing cost.
+**Why:** Maintain performance while optimizing cost.
 
-How:
+**How:**
 
 Install metrics-server:
 
@@ -471,14 +471,14 @@ kubectl autoscale deployment demo --cpu-percent=60 --min=2 --max=10
 
 Install Cluster Autoscaler (via Helm or cloud-specific manifest) with node group tags.
 
-Verify:
+**Verify:**
 
 ```bash
 kubectl get hpa
 kubectl get nodes
 ```
 
-Pitfalls & fixes:
+**Pitfalls & fixes:**
 
 Incorrect metrics-server permissions → HPA won't scale. Check API aggregation layer.
 
@@ -487,11 +487,11 @@ Scale-down thrash — tune cooldowns.
 
 ## 14 — Security Controls & Policy Enforcement (RBAC, Pod Security, OPA/Gatekeeper)
 
-What: RBAC hardening, PSP replacement (Pod Security Admission), OPA/Gatekeeper for policies.
+**What:** RBAC hardening, PSP replacement (Pod Security Admission), OPA/Gatekeeper for policies.
 
-Why: Prevent misconfigurations and enforce best practices.
+**Why:** Prevent misconfigurations and enforce best practices.
 
-How:
+**How:**
 
 Define RBAC roles for namespaces and service accounts.
 
@@ -499,22 +499,22 @@ Install Gatekeeper and add a policy (e.g., disallow hostPath and privileged cont
 
 Enable Pod Security Admission with `restricted` for production namespaces.
 
-Verify:
+**Verify:**
 
 Try deploying a privileged pod and show Gatekeeper/PSA rejecting it.
 
-Pitfalls & fixes:
+**Pitfalls & fixes:**
 
 Overly strict policies break legitimate apps — audit and adopt progressively.
 
 
 ## 15 — Backup & Disaster Recovery (Velero + PV snapshots)
 
-What: Velero for cluster object backups and snapshot integration for PVs.
+**What:** Velero for cluster object backups and snapshot integration for PVs.
 
-Why: Protect against accidental deletion and enable site recovery.
+**Why:** Protect against accidental deletion and enable site recovery.
 
-How:
+**How:**
 
 ```bash
 velero install --provider aws --bucket <bucket> --secret-file ./credentials-velero
@@ -524,7 +524,7 @@ velero backup create demo-backup --include-namespaces demo
 velero restore create --from-backup demo-backup
 ```
 
-Verify:
+**Verify:**
 
 ```bash
 velero backup get
@@ -532,7 +532,7 @@ velero restore get
 # Delete a namespace and demonstrate restore
 ```
 
-Pitfalls & fixes:
+**Pitfalls & fixes:**
 
 Snapshot provider compatibility — ensure CSI snapshots are supported.
 
@@ -541,32 +541,32 @@ Consistency for databases — use app-level backups for DBs (e.g., `pg_dump`) in
 
 ## 16 — Chaos Engineering & Runbooks (Drills)
 
-What: Runbooks for common incidents (pod crash, node failure, PV loss) + chaos experiments (Chaos Mesh/Gremlin).
+**What:** Runbooks for common incidents (pod crash, node failure, PV loss) + chaos experiments (Chaos Mesh/Gremlin).
 
-Why: Validate runbooks and platform resilience.
+**Why:** Validate runbooks and platform resilience.
 
-How:
+**How:**
 
 Create runbooks in a central doc system (Confluence / Git repo).
 
 Run a controlled chaos test: kill a node or evict a pod and follow runbook steps.
 
-Verify:
+**Verify:**
 
 Time to recovery, alerts triggered, SLO impact.
 
-Pitfalls & fixes:
+**Pitfalls & fixes:**
 
 Unplanned cascading failures — always run chaos on a non-production or well-scoped segment.
 
 
 ## 17 — Cost Governance & Observability for Platform
 
-What: Export cost metrics (cloud cost exporter), enforce `ResourceQuota` and `LimitRanges` per namespace.
+**What:** Export cost metrics (cloud cost exporter), enforce `ResourceQuota` and `LimitRanges` per namespace.
 
-Why: Keep cloud spend predictable and enforce quotas per team.
+**Why:** Keep cloud spend predictable and enforce quotas per team.
 
-How:
+**How:**
 
 Deploy cost-exporter or use cloud billing export to BigQuery/S3 + Grafana dashboards.
 
@@ -586,22 +586,22 @@ spec:
     limits.memory: 64Gi
 ```
 
-Verify:
+**Verify:**
 
 Try creating a deployment exceeding quota and show rejection.
 
-Pitfalls & fixes:
+**Pitfalls & fixes:**
 
 Hard quotas block legitimate burst workloads — set quotas with headroom.
 
 
 ## 18 — Day 2 Ops: upgrades, backups, maintenance windows, and runbook testing
 
-What: Documented upgrade process, daily/weekly maintenance (etcd backups, control plane patches), and scheduled DR drills.
+**What:** Documented upgrade process, daily/weekly maintenance (etcd backups, control plane patches), and scheduled DR drills.
 
-Why: Production safety and predictable change management.
+**Why:** Production safety and predictable change management.
 
-How:
+**How:**
 
 Use cluster lifecycle tooling (eksctl/managed upgrade path).
 
@@ -609,22 +609,22 @@ Schedule maintenance windows and use PodDisruptionBudgets for critical workloads
 
 Automate etcd snapshots (if self-hosted).
 
-Verify:
+**Verify:**
 
 Perform a minor version upgrade in a staging cluster and show successful rollout.
 
-Pitfalls & fixes:
+**Pitfalls & fixes:**
 
 Skipping PDBs can cause app downtime during upgrades — set PDBs for critical components.
 
 
 ## 19 — Observability & SLOs: Define SLIs, SLOs, Alerts & Runbooks
 
-What: Meaningful SLIs (latency, error rate), SLO targets, and alerting rules in Prometheus/Alertmanager with clear runbooks.
+**What:** Meaningful SLIs (latency, error rate), SLO targets, and alerting rules in Prometheus/Alertmanager with clear runbooks.
 
-Why: Drive engineering priorities and focus on customer-impacting metrics.
+**Why:** Drive engineering priorities and focus on customer-impacting metrics.
 
-How:
+**How:**
 
 Example Prometheus alert:
 
@@ -642,27 +642,27 @@ groups:
       runbook: "https://runbooks.example.com/high-5xx"
 ```
 
-Verify:
+**Verify:**
 
 Trigger alert via load test and show Alertmanager firing and notification.
 
-Pitfalls & fixes:
+**Pitfalls & fixes:**
 
 Alert fatigue — tune thresholds and use alert routing for severity.
 
 
 ## 20 — Deliverables & Repo (finalize)
 
-What: GitHub repo with:
+**What:** GitHub repo with:
 
 - Terraform for infra
 - Helm chart values for cert-manager, ingress, prometheus, fluentbit, argocd, linkerd/istio
 - ArgoCD App manifests (app-of-apps)
 - Runbooks and SLO definitions
 
-Why: Reproducible platform and single source of truth.
+**Why:** Reproducible platform and single source of truth.
 
-How:
+**How:**
 
 Structure repo:
 
@@ -673,11 +673,11 @@ apps/         # apps and argocd apps
 runbooks/     # markdown runbooks
 ```
 
-Verify:
+**Verify:**
 
 Show git clone then make bootstrap script that can deploy base platform to a dev cluster.
 
-Pitfalls & fixes:
+**Pitfalls & fixes:**
 
 Secrets in Git — avoid by using SealedSecrets/Vault integration or SOPS.
 
