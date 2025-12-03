@@ -1,3 +1,5 @@
+#                                                       DEVOPS ARCHITECTURE
+
 ## 0 — Prerequisites 
 
 **What to have ready:**
@@ -16,15 +18,15 @@ An SRE/Platform runbook document and owner for the cluster.
 
 **How (example: Terraform / AWS):**
 
-Terraform VPC module to create:
+  Terraform VPC module to create:
 
-3 private subnets (one per AZ)
+  3 private subnets (one per AZ)
 
-3 public subnets (for LBs)
+  3 public subnets (for LBs)
 
-NAT gateway(s) or NAT gateway per AZ for high availability
+  NAT gateway(s) or NAT gateway per AZ for high availability
 
-Create IAM roles: eks-cluster-role, eks-node-role with least privilege policies.
+  Create IAM roles: eks-cluster-role, eks-node-role with least privilege policies.
 
 **Verify:**
 
