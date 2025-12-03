@@ -1,4 +1,4 @@
-#                                                       DEVOPS ARCHITECTURE
+#                                                       DEVOPS ARCHITECTURE FOR PRODUCTION
 
 ## 0 — Prerequisites 
 
