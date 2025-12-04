@@ -628,7 +628,7 @@ Skipping PDBs can cause app downtime during upgrades — set PDBs for critical c
 
 **How:**
 
-Example Prometheus alert:
+Example Prometheus alerts:
 
 ```yaml
 groups:
