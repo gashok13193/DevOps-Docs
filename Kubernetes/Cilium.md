@@ -157,4 +157,25 @@ kubectl apply -f deny-egress.yaml
 ```bash
 kubectl -n demo exec -it deploy/frontend -- wget -qO- --timeout=3 http://backend-svc || echo "Denied!"
 ```
+### Allow frontend → backend traffic
+**allow.yaml**
 
+```yaml
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-client-to-server
+  namespace: demo
+spec:
+  endpointSelector:
+    matchLabels:
+      app: server
+  ingress:
+  - fromEndpoints:
+    - matchLabels:
+        app: client
+    toPorts:
+    - ports:
+      - port: "80"
+        protocol: TCP
+```
