@@ -1,7 +1,7 @@
-🚨 I Deleted a Kubernetes Namespace in Production 😨
+#🚨 I Deleted a Kubernetes Namespace in Production 😨
 
 
-WHAT HAPPENS INSIDE KUBERNETES
+##WHAT HAPPENS INSIDE KUBERNETES
 
 Step 1: Namespace marked for deletion
 kubectl get ns payments -o yaml
