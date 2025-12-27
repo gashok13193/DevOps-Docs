@@ -1,10 +1,10 @@
-# 📊 Monitor Said OK — Monitoring & Health Check Guide
+# 📊 Monitoring Said OK — Monitoring & Health Check Guide
 
 A comprehensive guide to monitoring systems, health checks, and status reporting in modern infrastructure.
 
 ---
 
-## ✅ What Does "Monitor Said OK" Mean?
+## ✅ What Does "Monitoring Said OK" Mean?
 
 When a monitoring system reports **"OK"**, it indicates that:
 
