@@ -19,7 +19,10 @@ kubectl create deployment slow-app --image=nginx
 ```bash
 kubectl expose deployment slow-app --port=80 --type=NodePort
 ```
+```bash
+kubectl get svc slow-app
 
+```
 ---
 
 ### 🟢 STEP 3: Access the app
