@@ -38,6 +38,10 @@ kubectl get nodes -o wide
 ```bash
 curl http://<NODE-IP>:<NODE-PORT>
 ```
+### Install Metrics Server
+```bash
+kubectl apply -f https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml
+```
 
 ---
 
