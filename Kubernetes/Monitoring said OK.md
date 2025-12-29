@@ -9,36 +9,45 @@ A practical demonstration of why infrastructure metrics can show "OK" while user
 ### 🟢 STEP 1: Deploy the application
 
 ```bash
-kubectl create deployment slow-app --image=nginx
+kubectl create deployment slow-app --image=python:3.11-slim -- sh -c '
+cat <<EOF > server.py
+from http.server import BaseHTTPRequestHandler, HTTPServer
+import time
+
+class Handler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        time.sleep(3)   # 🔥 REAL DELAY
+        self.send_response(200)
+        self.end_headers()
+        self.wfile.write(b"Hello from slow app")
+
+HTTPServer(("0.0.0.0", 8080), Handler).serve_forever()
+EOF
+python server.py
+'
+
 ```
 
 ---
 
-### 🟢 STEP 2: Expose the app
+### 🟢 STEP 2: Expose the app internally
 
 ```bash
-kubectl expose deployment slow-app --port=80 --type=NodePort
-```
-```bash
-kubectl get svc slow-app
+kubectl expose deployment slow-app --port=8080
 
 ```
 ---
 
-### 🟢 STEP 3: Access the app
+### 🟢 STEP 3: Port-forward
 
-**Get Node IP:**
 
-```bash
-kubectl get nodes -o wide
-```
-
-**Test:**
 
 ```bash
-curl http://<NODE-IP>:<NODE-PORT>
+kubectl port-forward svc/slow-app 8080:8080
+
 ```
-### Install Metrics Server
+
+### 🟢 STEP 4: Install Metrics Server
 ```bash
 kubectl apply -f https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml
 
@@ -57,49 +66,15 @@ containers:
 
 ---
 
-### 🟢 STEP 4: Install curl inside the pod
-
-```bash
-kubectl exec -it deploy/slow-app -- /bin/sh
-```
-
-```bash
-apt update
-apt install -y curl
-```
-
-**Verify:**
-
-```bash
-curl localhost
-```
-
 ---
 
-### 🔴 STEP 5: Introduce REAL latency
-
-```bash
-kubectl exec -it deploy/slow-app -- /bin/sh
-```
-
-**Modify nginx configuration:**
-
-```bash
-sed -i 's/index  index.html index.htm;/index  index.html index.htm;\n        add_header X-Demo "Slow App";\n        proxy_read_timeout 10s;/' /etc/nginx/nginx.conf
-```
-
-**Restart nginx:**
-
-```bash
-nginx -s reload
-```
-
-**Now simulate delay:**
+### 🔴 STEP 5: REAL latency
 
 ```bash
 while true; do
-  sleep 3
+  curl -s -o /dev/null -w "%{time_total}\n" http://localhost:8080
 done
+
 ```
 
 ---
