@@ -1,4 +1,4 @@
-## Kubernetes Security – What 90% of Engineers Ignore
+## Kubernetes Security
 
 ### Why Most Clusters Are Insecure
 
