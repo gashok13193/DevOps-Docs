@@ -1,0 +1,524 @@
+/**
+ * ============================================
+ * Complete CI/CD Pipeline for Java Application
+ * ============================================
+ * 
+ * This Jenkinsfile demonstrates a production-grade CI pipeline with:
+ * - Git Checkout
+ * - Maven Build
+ * - Unit Testing
+ * - Code Coverage (JaCoCo)
+ * - SonarQube Analysis
+ * - Artifact Upload to Artifactory
+ * - Docker Image Build
+ * - Docker Image Push to Registry
+ * - Security Scanning (Trivy)
+ * - Helm Chart Update for GitOps
+
+pipeline {
+    // Agent Configuration
+    agent {
+        kubernetes {
+            yaml '''
+                apiVersion: v1
+                kind: Pod
+                metadata:
+                  labels:
+                    jenkins-agent: true
+                spec:
+                  containers:
+                  - name: maven
+                    image: maven:3.9.6-eclipse-temurin-17-alpine
+                    command:
+                    - cat
+                    tty: true
+                    volumeMounts:
+                    - name: maven-cache
+                      mountPath: /root/.m2
+                  - name: docker
+                    image: docker:24.0-dind
+                    securityContext:
+                      privileged: true
+                    volumeMounts:
+                    - name: docker-socket
+                      mountPath: /var/run/docker.sock
+                  - name: trivy
+                    image: aquasec/trivy:latest
+                    command:
+                    - cat
+                    tty: true
+                  volumes:
+                  - name: maven-cache
+                    persistentVolumeClaim:
+                      claimName: maven-cache-pvc
+                  - name: docker-socket
+                    hostPath:
+                      path: /var/run/docker.sock
+            '''
+        }
+    }
+
+    // Environment Variables
+    environment {
+        // Application Info
+        APP_NAME = 'devops-java-app'
+        APP_VERSION = readMavenPom().getVersion()
+        
+        // Docker Registry
+        DOCKER_REGISTRY = credentials('docker-registry-url')
+        DOCKER_IMAGE = "${DOCKER_REGISTRY}/${APP_NAME}"
+        DOCKER_CREDENTIALS = credentials('docker-registry-credentials')
+        
+        // SonarQube
+        SONAR_HOST_URL = credentials('sonarqube-url')
+        SONAR_TOKEN = credentials('sonarqube-token')
+        
+        // Artifactory
+        ARTIFACTORY_URL = credentials('artifactory-url')
+        ARTIFACTORY_CREDENTIALS = credentials('artifactory-credentials')
+        
+        // Git
+        GIT_COMMIT_SHORT = sh(script: "git rev-parse --short HEAD", returnStdout: true).trim()
+        
+        // Build Info
+        BUILD_TIMESTAMP = sh(script: "date '+%Y%m%d-%H%M%S'", returnStdout: true).trim()
+    }
+
+    // Pipeline Options
+    options {
+        // Keep builds for 30 days
+        buildDiscarder(logRotator(numToKeepStr: '30', daysToKeepStr: '30'))
+        
+        // Timeout for entire pipeline
+        timeout(time: 60, unit: 'MINUTES')
+        
+        // Prevent concurrent builds
+        disableConcurrentBuilds()
+        
+        // Add timestamps to console output
+        timestamps()
+        
+        // Git checkout with submodules
+        skipDefaultCheckout(true)
+    }
+
+    // Parameterized Build
+    parameters {
+        choice(
+            name: 'DEPLOY_ENV',
+            choices: ['dev', 'staging', 'prod'],
+            description: 'Target deployment environment'
+        )
+        booleanParam(
+            name: 'SKIP_TESTS',
+            defaultValue: false,
+            description: 'Skip unit tests (not recommended)'
+        )
+        booleanParam(
+            name: 'SKIP_SONAR',
+            defaultValue: false,
+            description: 'Skip SonarQube analysis'
+        )
+        string(
+            name: 'IMAGE_TAG',
+            defaultValue: '',
+            description: 'Custom Docker image tag (optional)'
+        )
+    }
+
+    stages {
+        /**
+         * Stage 1: Git Checkout
+         * Clones the repository and checks out the appropriate branch
+         */
+        stage('Git Checkout') {
+            steps {
+                echo "=========================================="
+                echo "Stage: Git Checkout"
+                echo "=========================================="
+                
+                checkout([
+                    $class: 'GitSCM',
+                    branches: [[name: "${env.BRANCH_NAME ?: 'main'}"]],
+                    extensions: [
+                        [$class: 'CloneOption', depth: 1, shallow: true],
+                        [$class: 'CleanBeforeCheckout'],
+                        [$class: 'SubmoduleOption', 
+                         disableSubmodules: false,
+                         recursiveSubmodules: true]
+                    ],
+                    userRemoteConfigs: [[
+                        url: "${env.GIT_URL}",
+                        credentialsId: 'git-credentials'
+                    ]]
+                ])
+                
+                script {
+                    // Set build display name
+                    currentBuild.displayName = "#${BUILD_NUMBER}-${GIT_COMMIT_SHORT}"
+                }
+            }
+        }
+
+        /**
+         * Stage 2: Build Application
+         * Compiles the Java application using Maven
+         */
+        stage('Build') {
+            steps {
+                container('maven') {
+                    echo "=========================================="
+                    echo "Stage: Maven Build"
+                    echo "=========================================="
+                    
+                    sh '''
+                        mvn clean compile -B \
+                            -Dmaven.test.skip=true \
+                            -Dorg.slf4j.simpleLogger.log.org.apache.maven.cli.transfer.Slf4jMavenTransferListener=warn
+                    '''
+                }
+            }
+        }
+
+        /**
+         * Stage 3: Unit Tests
+         * Runs unit tests and generates code coverage report
+         */
+        stage('Unit Tests') {
+            when {
+                expression { return !params.SKIP_TESTS }
+            }
+            steps {
+                container('maven') {
+                    echo "=========================================="
+                    echo "Stage: Unit Tests with JaCoCo Coverage"
+                    echo "=========================================="
+                    
+                    sh '''
+                        mvn test -B \
+                            -Dmaven.test.failure.ignore=false
+                    '''
+                }
+            }
+            post {
+                always {
+                    // Archive test results
+                    junit(
+                        testResults: '**/target/surefire-reports/*.xml',
+                        allowEmptyResults: true
+                    )
+                    
+                    // Archive code coverage
+                    jacoco(
+                        execPattern: '**/target/jacoco.exec',
+                        classPattern: '**/target/classes',
+                        sourcePattern: '**/src/main/java',
+                        exclusionPattern: '**/test/**'
+                    )
+                }
+            }
+        }
+
+        /**
+         * Stage 4: SonarQube Analysis
+         * Performs code quality analysis and security scanning
+         */
+        stage('SonarQube Analysis') {
+            when {
+                expression { return !params.SKIP_SONAR }
+            }
+            steps {
+                container('maven') {
+                    echo "=========================================="
+                    echo "Stage: SonarQube Code Analysis"
+                    echo "=========================================="
+                    
+                    withSonarQubeEnv('SonarQube') {
+                        sh '''
+                            mvn sonar:sonar -B \
+                                -Dsonar.projectKey=${APP_NAME} \
+                                -Dsonar.projectName="${APP_NAME}" \
+                                -Dsonar.projectVersion=${APP_VERSION} \
+                                -Dsonar.coverage.jacoco.xmlReportPaths=target/site/jacoco/jacoco.xml \
+                                -Dsonar.java.binaries=target/classes \
+                                -Dsonar.java.source=17
+                        '''
+                    }
+                }
+            }
+        }
+
+        /**
+         * Stage 5: Quality Gate
+         * Waits for SonarQube quality gate result
+         */
+        stage('Quality Gate') {
+            when {
+                expression { return !params.SKIP_SONAR }
+            }
+            steps {
+                echo "=========================================="
+                echo "Stage: Quality Gate Check"
+                echo "=========================================="
+                
+                timeout(time: 10, unit: 'MINUTES') {
+                    waitForQualityGate abortPipeline: true
+                }
+            }
+        }
+
+        /**
+         * Stage 6: Package Application
+         * Creates the final JAR artifact
+         */
+        stage('Package') {
+            steps {
+                container('maven') {
+                    echo "=========================================="
+                    echo "Stage: Package Application"
+                    echo "=========================================="
+                    
+                    sh '''
+                        mvn package -B -DskipTests \
+                            -Dmaven.test.skip=true
+                    '''
+                }
+            }
+            post {
+                success {
+                    // Archive the artifact
+                    archiveArtifacts(
+                        artifacts: 'target/*.jar',
+                        fingerprint: true
+                    )
+                }
+            }
+        }
+
+        /**
+         * Stage 7: Push to Artifactory
+         * Uploads artifacts to JFrog Artifactory
+         */
+        stage('Push to Artifactory') {
+            steps {
+                container('maven') {
+                    echo "=========================================="
+                    echo "Stage: Upload to Artifactory"
+                    echo "=========================================="
+                    
+                    configFileProvider([configFile(fileId: 'maven-settings', variable: 'MAVEN_SETTINGS')]) {
+                        sh '''
+                            mvn deploy -B -DskipTests \
+                                -s ${MAVEN_SETTINGS} \
+                                -DaltDeploymentRepository=releases::default::${ARTIFACTORY_URL}/libs-release-local
+                        '''
+                    }
+                }
+            }
+        }
+
+        /**
+         * Stage 8: Build Docker Image
+         * Creates container image using multi-stage Dockerfile
+         */
+        stage('Build Docker Image') {
+            steps {
+                container('docker') {
+                    echo "=========================================="
+                    echo "Stage: Build Docker Image"
+                    echo "=========================================="
+                    
+                    script {
+                        // Determine image tag
+                        def imageTag = params.IMAGE_TAG ?: "${APP_VERSION}-${GIT_COMMIT_SHORT}"
+                        env.DOCKER_TAG = imageTag
+                        
+                        sh """
+                            docker build \
+                                --build-arg BUILD_DATE=\$(date -u +'%Y-%m-%dT%H:%M:%SZ') \
+                                --build-arg VERSION=${APP_VERSION} \
+                                --build-arg VCS_REF=${GIT_COMMIT_SHORT} \
+                                --tag ${DOCKER_IMAGE}:${imageTag} \
+                                --tag ${DOCKER_IMAGE}:latest \
+                                --file Dockerfile \
+                                .
+                        """
+                    }
+                }
+            }
+        }
+
+        /**
+         * Stage 9: Security Scan
+         * Scans Docker image for vulnerabilities using Trivy
+         */
+        stage('Security Scan') {
+            steps {
+                container('trivy') {
+                    echo "=========================================="
+                    echo "Stage: Container Security Scan (Trivy)"
+                    echo "=========================================="
+                    
+                    sh """
+                        trivy image \
+                            --severity HIGH,CRITICAL \
+                            --no-progress \
+                            --format table \
+                            --exit-code 0 \
+                            ${DOCKER_IMAGE}:${DOCKER_TAG}
+                    """
+                    
+                    // Generate JSON report for archiving
+                    sh """
+                        trivy image \
+                            --format json \
+                            --output trivy-report.json \
+                            ${DOCKER_IMAGE}:${DOCKER_TAG}
+                    """
+                }
+            }
+            post {
+                always {
+                    archiveArtifacts(
+                        artifacts: 'trivy-report.json',
+                        allowEmptyArchive: true
+                    )
+                }
+            }
+        }
+
+        /**
+         * Stage 10: Push Docker Image
+         * Pushes the Docker image to container registry
+         */
+        stage('Push Docker Image') {
+            steps {
+                container('docker') {
+                    echo "=========================================="
+                    echo "Stage: Push Docker Image to Registry"
+                    echo "=========================================="
+                    
+                    script {
+                        docker.withRegistry("https://${DOCKER_REGISTRY}", 'docker-registry-credentials') {
+                            sh """
+                                docker push ${DOCKER_IMAGE}:${DOCKER_TAG}
+                                docker push ${DOCKER_IMAGE}:latest
+                            """
+                        }
+                    }
+                }
+            }
+        }
+
+        /**
+         * Stage 11: Update Helm Chart
+         * Updates Helm chart values for GitOps deployment
+         */
+        stage('Update Helm Chart') {
+            when {
+                branch 'main'
+            }
+            steps {
+                echo "=========================================="
+                echo "Stage: Update Helm Chart for GitOps"
+                echo "=========================================="
+                
+                script {
+                    // Clone GitOps repository
+                    withCredentials([usernamePassword(credentialsId: 'git-credentials', 
+                                                      usernameVariable: 'GIT_USER', 
+                                                      passwordVariable: 'GIT_TOKEN')]) {
+                        sh """
+                            git clone https://${GIT_USER}:${GIT_TOKEN}@github.com/org/gitops-repo.git
+                            cd gitops-repo
+                            
+                            # Update values.yaml with new image tag
+                            sed -i 's|tag:.*|tag: "${DOCKER_TAG}"|g' helm/devops-java-app/values-${params.DEPLOY_ENV}.yaml
+                            
+                            # Commit and push changes
+                            git config user.email "jenkins@company.com"
+                            git config user.name "Jenkins CI"
+                            git add .
+                            git commit -m "Update ${APP_NAME} image tag to ${DOCKER_TAG} [skip ci]" || true
+                            git push origin main
+                        """
+                    }
+                }
+            }
+        }
+    }
+
+    // Post-Pipeline Actions
+    post {
+        always {
+            echo "=========================================="
+            echo "Pipeline Completed"
+            echo "=========================================="
+            
+            // Clean workspace
+            cleanWs()
+        }
+        
+        success {
+            echo "Pipeline SUCCESS"
+            
+            // Send success notification
+            slackSend(
+                channel: '#devops-notifications',
+                color: 'good',
+                message: """
+                    :white_check_mark: *BUILD SUCCESS*
+                    *Job:* ${env.JOB_NAME}
+                    *Build:* #${env.BUILD_NUMBER}
+                    *Image:* ${DOCKER_IMAGE}:${DOCKER_TAG}
+                    *Duration:* ${currentBuild.durationString}
+                """.stripIndent()
+            )
+        }
+        
+        failure {
+            echo "Pipeline FAILED"
+            
+            // Send failure notification
+            slackSend(
+                channel: '#devops-notifications',
+                color: 'danger',
+                message: """
+                    :x: *BUILD FAILED*
+                    *Job:* ${env.JOB_NAME}
+                    *Build:* #${env.BUILD_NUMBER}
+                    *Stage:* ${env.STAGE_NAME}
+                    *Console:* ${env.BUILD_URL}console
+                """.stripIndent()
+            )
+            
+            // Send email notification
+            emailext(
+                subject: "FAILED: Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]'",
+                body: """
+                    <p>Build failed for ${env.JOB_NAME}</p>
+                    <p>Check console output at: ${env.BUILD_URL}</p>
+                """,
+                recipientProviders: [
+                    [$class: 'DevelopersRecipientProvider'],
+                    [$class: 'RequesterRecipientProvider']
+                ]
+            )
+        }
+        
+        unstable {
+            echo "Pipeline UNSTABLE"
+            
+            slackSend(
+                channel: '#devops-notifications',
+                color: 'warning',
+                message: """
+                    :warning: *BUILD UNSTABLE*
+                    *Job:* ${env.JOB_NAME}
+                    *Build:* #${env.BUILD_NUMBER}
+                    *Duration:* ${currentBuild.durationString}
+                """.stripIndent()
+            )
+        }
+    }
+}

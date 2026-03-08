@@ -1,0 +1,156 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- 
+============================================
+Maven Settings Template for CI/CD
+============================================
+
+This file configures Maven to work with:
+- Artifactory/Nexus for artifact storage
+- Mirror configuration for dependencies
+- Server credentials for deployment
+
+Usage:
+1. Copy to ~/.m2/settings.xml
+2. Replace placeholders with actual values
+3. In Jenkins, store as Managed File with ID 'maven-settings'
+
+-->
+<settings xmlns="http://maven.apache.org/SETTINGS/1.2.0"
+          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+          xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.2.0
+                              https://maven.apache.org/xsd/settings-1.2.0.xsd">
+
+    <!-- Local repository path -->
+    <localRepository>${user.home}/.m2/repository</localRepository>
+
+    <!-- Server Credentials -->
+    <servers>
+        <!-- Artifactory Release Repository -->
+        <server>
+            <id>releases</id>
+            <username>${env.ARTIFACTORY_USER}</username>
+            <password>${env.ARTIFACTORY_PASSWORD}</password>
+        </server>
+        
+        <!-- Artifactory Snapshot Repository -->
+        <server>
+            <id>snapshots</id>
+            <username>${env.ARTIFACTORY_USER}</username>
+            <password>${env.ARTIFACTORY_PASSWORD}</password>
+        </server>
+        
+        <!-- Central Mirror (Artifactory) -->
+        <server>
+            <id>central-mirror</id>
+            <username>${env.ARTIFACTORY_USER}</username>
+            <password>${env.ARTIFACTORY_PASSWORD}</password>
+        </server>
+    </servers>
+
+    <!-- Repository Mirrors -->
+    <mirrors>
+        <!-- Mirror all repositories through Artifactory -->
+        <mirror>
+            <id>central-mirror</id>
+            <name>Artifactory Central Mirror</name>
+            <url>${env.ARTIFACTORY_URL}/libs-release</url>
+            <mirrorOf>central</mirrorOf>
+        </mirror>
+    </mirrors>
+
+    <!-- Profiles -->
+    <profiles>
+        <!-- CI/CD Profile -->
+        <profile>
+            <id>ci</id>
+            <activation>
+                <activeByDefault>false</activeByDefault>
+            </activation>
+            
+            <!-- Repositories -->
+            <repositories>
+                <repository>
+                    <id>central</id>
+                    <name>Central Repository</name>
+                    <url>https://repo.maven.apache.org/maven2</url>
+                    <releases>
+                        <enabled>true</enabled>
+                    </releases>
+                    <snapshots>
+                        <enabled>false</enabled>
+                    </snapshots>
+                </repository>
+            </repositories>
+            
+            <!-- Plugin Repositories -->
+            <pluginRepositories>
+                <pluginRepository>
+                    <id>central</id>
+                    <name>Central Repository</name>
+                    <url>https://repo.maven.apache.org/maven2</url>
+                    <releases>
+                        <enabled>true</enabled>
+                    </releases>
+                    <snapshots>
+                        <enabled>false</enabled>
+                    </snapshots>
+                </pluginRepository>
+            </pluginRepositories>
+            
+            <!-- Properties -->
+            <properties>
+                <maven.test.failure.ignore>false</maven.test.failure.ignore>
+            </properties>
+        </profile>
+        
+        <!-- SonarQube Profile -->
+        <profile>
+            <id>sonar</id>
+            <activation>
+                <activeByDefault>false</activeByDefault>
+            </activation>
+            <properties>
+                <sonar.host.url>${env.SONAR_HOST_URL}</sonar.host.url>
+                <sonar.login>${env.SONAR_TOKEN}</sonar.login>
+            </properties>
+        </profile>
+        
+        <!-- Artifactory Profile -->
+        <profile>
+            <id>artifactory</id>
+            <activation>
+                <activeByDefault>false</activeByDefault>
+            </activation>
+            <repositories>
+                <repository>
+                    <id>artifactory-releases</id>
+                    <name>Artifactory Releases</name>
+                    <url>${env.ARTIFACTORY_URL}/libs-release</url>
+                    <releases>
+                        <enabled>true</enabled>
+                    </releases>
+                    <snapshots>
+                        <enabled>false</enabled>
+                    </snapshots>
+                </repository>
+                <repository>
+                    <id>artifactory-snapshots</id>
+                    <name>Artifactory Snapshots</name>
+                    <url>${env.ARTIFACTORY_URL}/libs-snapshot</url>
+                    <releases>
+                        <enabled>false</enabled>
+                    </releases>
+                    <snapshots>
+                        <enabled>true</enabled>
+                    </snapshots>
+                </repository>
+            </repositories>
+        </profile>
+    </profiles>
+
+    <!-- Active Profiles -->
+    <activeProfiles>
+        <activeProfile>ci</activeProfile>
+    </activeProfiles>
+
+</settings>

@@ -1,0 +1,57 @@
+# ============================================
+# Development Environment Values
+# ============================================
+
+app:
+  name: devops-java-app
+  environment: development
+
+replicaCount: 1
+
+image:
+  repository: registry.company.com/devops-java-app
+  tag: "latest"
+  pullPolicy: Always
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 256Mi
+  limits:
+    cpu: 500m
+    memory: 512Mi
+
+autoscaling:
+  enabled: false
+
+ingress:
+  enabled: true
+  className: nginx
+  hosts:
+    - host: dev-api.company.local
+      paths:
+        - path: /
+          pathType: Prefix
+  tls: []
+
+env:
+  - name: SPRING_PROFILES_ACTIVE
+    value: "default"
+  - name: SERVER_PORT
+    value: "8080"
+  - name: LOG_LEVEL
+    value: "DEBUG"
+
+livenessProbe:
+  initialDelaySeconds: 30
+  periodSeconds: 10
+
+readinessProbe:
+  initialDelaySeconds: 15
+  periodSeconds: 5
+
+podDisruptionBudget:
+  enabled: false
+
+serviceMonitor:
+  enabled: false

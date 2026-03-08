@@ -1,0 +1,94 @@
+# ============================================
+# ArgoCD Application - Production Environment
+# ============================================
+# 
+# Production environment with manual sync and approvals
+# 
+# Interview Questions:
+# 1. Why use manual sync for production?
+# 2. What is prune and why might you disable it for production?
+# 3. How do you implement deployment approvals with ArgoCD?
+
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: devops-java-app-prod
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: devops-java-app
+    app.kubernetes.io/environment: production
+    app.kubernetes.io/managed-by: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "30"
+    # Notification subscriptions
+    notifications.argoproj.io/subscribe.on-sync-succeeded.slack: production-deployments
+    notifications.argoproj.io/subscribe.on-sync-failed.slack: production-alerts
+    notifications.argoproj.io/subscribe.on-health-degraded.pagerduty: prod-oncall
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  # Use a specific project with RBAC restrictions
+  project: production
+  
+  source:
+    repoURL: https://github.com/your-org/devops-java-app.git
+    # Use a specific release branch/tag for production
+    targetRevision: release/1.0.0
+    path: helm/devops-java-app
+    
+    helm:
+      valueFiles:
+        - values.yaml
+        - values-prod.yaml
+      
+      parameters:
+        - name: image.tag
+          value: "1.0.0"
+        - name: app.environment
+          value: "production"
+        - name: replicaCount
+          value: "3"
+  
+  destination:
+    # Production cluster (could be different cluster)
+    server: https://production-cluster.company.com:6443
+    namespace: devops-prod
+  
+  # Manual sync policy for production safety
+  syncPolicy:
+    # NO automated sync for production - requires manual approval
+    # automated: null
+    syncOptions:
+      - CreateNamespace=true
+      - PrunePropagationPolicy=background
+      - RespectIgnoreDifferences=true
+      - ServerSideApply=true
+    retry:
+      limit: 3
+      backoff:
+        duration: 30s
+        factor: 2
+        maxDuration: 5m
+  
+  # Ignore autoscaler changes
+  ignoreDifferences:
+    - group: apps
+      kind: Deployment
+      jsonPointers:
+        - /spec/replicas
+    - group: autoscaling
+      kind: HorizontalPodAutoscaler
+      jsonPointers:
+        - /spec/minReplicas
+        - /spec/maxReplicas
+  
+  revisionHistoryLimit: 20
+  
+  # Info for better visibility
+  info:
+    - name: Team
+      value: DevOps
+    - name: Slack
+      value: "#production-deployments"
+    - name: Runbook
+      value: https://wiki.company.com/devops-java-app-runbook

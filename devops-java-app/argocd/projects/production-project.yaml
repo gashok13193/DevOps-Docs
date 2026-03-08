@@ -1,0 +1,130 @@
+# ============================================
+# ArgoCD AppProject for Production
+# ============================================
+# 
+# AppProject defines RBAC and restrictions for applications
+# 
+# Interview Questions:
+# 1. What is an ArgoCD AppProject?
+#    - Logical grouping of applications with RBAC
+#    - Defines allowed sources, destinations, and resources
+# 
+# 2. How do you restrict which clusters apps can deploy to?
+#    - Use destination.server whitelist in AppProject
+# 
+# 3. What are cluster resource whitelists/blacklists?
+#    - Control which Kubernetes resources can be created
+
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: production
+  namespace: argocd
+  labels:
+    environment: production
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  description: Production environment project with strict policies
+  
+  # Allowed source repositories
+  sourceRepos:
+    - 'https://github.com/your-org/devops-java-app.git'
+    - 'https://github.com/your-org/gitops-repo.git'
+  
+  # Allowed destination clusters and namespaces
+  destinations:
+    - server: https://production-cluster.company.com:6443
+      namespace: devops-prod
+    - server: https://kubernetes.default.svc
+      namespace: devops-prod
+  
+  # Cluster-scoped resources that can be created
+  clusterResourceWhitelist:
+    - group: ''
+      kind: Namespace
+    - group: networking.k8s.io
+      kind: IngressClass
+  
+  # Namespace-scoped resources that can be created
+  namespaceResourceWhitelist:
+    - group: ''
+      kind: ConfigMap
+    - group: ''
+      kind: Secret
+    - group: ''
+      kind: Service
+    - group: ''
+      kind: ServiceAccount
+    - group: apps
+      kind: Deployment
+    - group: apps
+      kind: StatefulSet
+    - group: networking.k8s.io
+      kind: Ingress
+    - group: autoscaling
+      kind: HorizontalPodAutoscaler
+    - group: policy
+      kind: PodDisruptionBudget
+    - group: monitoring.coreos.com
+      kind: ServiceMonitor
+  
+  # Cluster-scoped resources that are denied
+  clusterResourceBlacklist:
+    - group: ''
+      kind: Node
+    - group: rbac.authorization.k8s.io
+      kind: ClusterRole
+    - group: rbac.authorization.k8s.io
+      kind: ClusterRoleBinding
+  
+  # Roles for project-level RBAC
+  roles:
+    - name: production-deployer
+      description: Can sync production applications
+      policies:
+        - p, proj:production:production-deployer, applications, get, production/*, allow
+        - p, proj:production:production-deployer, applications, sync, production/*, allow
+        - p, proj:production:production-deployer, applications, action/*, production/*, allow
+      groups:
+        - production-team
+    
+    - name: production-viewer
+      description: Can only view production applications
+      policies:
+        - p, proj:production:production-viewer, applications, get, production/*, allow
+      groups:
+        - developers
+  
+  # Sync windows for controlled deployments
+  syncWindows:
+    # Allow deployments only during business hours on weekdays
+    - kind: allow
+      schedule: '0 9-17 * * 1-5'  # Mon-Fri, 9am-5pm
+      duration: 8h
+      applications:
+        - '*'
+      namespaces:
+        - devops-prod
+      manualSync: true
+    
+    # Deny deployments during weekends except emergencies
+    - kind: deny
+      schedule: '0 0 * * 0,6'  # Sat-Sun
+      duration: 48h
+      applications:
+        - '*'
+      namespaces:
+        - devops-prod
+      manualSync: false
+  
+  # Orphaned resources monitoring
+  orphanedResources:
+    warn: true
+    ignore:
+      - group: ""
+        kind: ConfigMap
+        name: kube-root-ca.crt
+  
+  # Signatures for verification (if using signed commits)
+  signatureKeys: []

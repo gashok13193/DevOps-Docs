@@ -1,0 +1,32 @@
+{{/*
+============================================
+Kubernetes Service Template
+============================================
+
+Interview Questions:
+1. What are the different types of Services in Kubernetes?
+2. Explain ClusterIP, NodePort, LoadBalancer, and ExternalName
+3. How does service discovery work in Kubernetes?
+4. What is the difference between targetPort and port?
+5. What are Endpoints in Kubernetes?
+*/}}
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "devops-java-app.fullname" . }}
+  labels:
+    {{- include "devops-java-app.labels" . | nindent 4 }}
+  {{- with .Values.service.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  type: {{ .Values.service.type }}
+  ports:
+    - port: {{ .Values.service.port }}
+      targetPort: {{ .Values.service.targetPort }}
+      protocol: TCP
+      name: http
+  selector:
+    {{- include "devops-java-app.selectorLabels" . | nindent 4 }}

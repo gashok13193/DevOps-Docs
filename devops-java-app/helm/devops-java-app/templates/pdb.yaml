@@ -1,0 +1,30 @@
+{{/*
+============================================
+Kubernetes PodDisruptionBudget Template
+============================================
+
+Interview Questions:
+1. What is a PodDisruptionBudget and why is it important?
+2. Explain voluntary vs involuntary disruptions
+3. How does PDB affect cluster operations like draining nodes?
+4. What's the difference between minAvailable and maxUnavailable?
+*/}}
+
+{{- if .Values.podDisruptionBudget.enabled }}
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ include "devops-java-app.fullname" . }}
+  labels:
+    {{- include "devops-java-app.labels" . | nindent 4 }}
+spec:
+  {{- if .Values.podDisruptionBudget.minAvailable }}
+  minAvailable: {{ .Values.podDisruptionBudget.minAvailable }}
+  {{- end }}
+  {{- if .Values.podDisruptionBudget.maxUnavailable }}
+  maxUnavailable: {{ .Values.podDisruptionBudget.maxUnavailable }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "devops-java-app.selectorLabels" . | nindent 6 }}
+{{- end }}

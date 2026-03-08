@@ -1,0 +1,52 @@
+# ============================================
+# Helm Chart Metadata
+# ============================================
+# 
+
+
+apiVersion: v2
+name: devops-java-app
+description: A Helm chart for deploying DevOps Java Application to Kubernetes
+type: application
+
+# Chart version - increment for chart changes
+version: 1.0.0
+
+# Application version - matches the Docker image version
+appVersion: "1.0.0"
+
+# Keywords for chart discovery
+keywords:
+  - java
+  - spring-boot
+  - devops
+  - microservice
+
+# Maintainer information
+maintainers:
+  - name: DevOps Team
+    email: devops@company.com
+    url: https://company.com
+
+# Home page
+home: https://github.com/org/devops-java-app
+
+# Source code repository
+sources:
+  - https://github.com/org/devops-java-app
+
+# Icon for Helm UI
+icon: https://company.com/logo.png
+
+# Annotations for additional metadata
+annotations:
+  category: Applications
+  licenses: Apache-2.0
+
+# Dependencies (if any)
+dependencies: []
+  # Example dependency:
+  # - name: postgresql
+  #   version: "12.x.x"
+  #   repository: "https://charts.bitnami.com/bitnami"
+  #   condition: postgresql.enabled

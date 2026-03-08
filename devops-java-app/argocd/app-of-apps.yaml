@@ -1,0 +1,67 @@
+# ============================================
+# ArgoCD App of Apps - Parent Application
+# ============================================
+# 
+# This is the root application that manages all child applications
+# using the "App of Apps" pattern.
+# 
+# Interview Questions:
+# 1. What is the App of Apps pattern in ArgoCD?
+#    - It's a pattern where one ArgoCD Application manages other Applications
+#    - Enables hierarchical organization and bulk management
+# 
+# 2. What are the benefits of App of Apps?
+#    - Centralized management of multiple applications
+#    - Easy to bootstrap entire clusters
+#    - Enables GitOps for platform teams
+# 
+# 3. How does ArgoCD sync work?
+#    - Compares desired state (Git) with actual state (cluster)
+#    - Can auto-sync or manual sync
+#    - Supports sync waves and hooks
+# 
+# 4. What is sync policy in ArgoCD?
+#    - Defines how/when ArgoCD syncs applications
+#    - Options: automated, prune, self-heal
+
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: devops-apps
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: devops-apps
+    app.kubernetes.io/part-of: devops-platform
+  # Finalizer ensures proper cleanup
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  
+  # Source repository containing child applications
+  source:
+    repoURL: https://github.com/your-org/gitops-repo.git
+    targetRevision: main
+    path: argocd/apps
+  
+  # Destination cluster (in-cluster)
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: argocd
+  
+  # Sync policy for the parent app
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+      allowEmpty: false
+    syncOptions:
+      - CreateNamespace=true
+      - PrunePropagationPolicy=foreground
+      - PruneLast=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m

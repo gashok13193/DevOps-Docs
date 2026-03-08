@@ -1,0 +1,54 @@
+# ===========================================
+# Docker Ignore File
+# Prevents unnecessary files from being sent to Docker daemon
+# ===========================================
+
+# Git
+.git
+.gitignore
+.gitattributes
+
+# Maven
+target/
+*.jar
+!src/**/resources/*.jar
+
+# IDE
+.idea/
+*.iml
+.project
+.classpath
+.settings/
+*.swp
+*.swo
+.vscode/
+
+# CI/CD
+Jenkinsfile
+.github/
+.gitlab-ci.yml
+
+# Documentation
+*.md
+docs/
+
+# Kubernetes/Helm
+helm/
+k8s/
+argocd/
+
+# Logs
+*.log
+logs/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Test files (already run in CI)
+src/test/
+
+# Docker files (no need to include in context)
+Dockerfile
+docker-compose*.yml
+.dockerignore

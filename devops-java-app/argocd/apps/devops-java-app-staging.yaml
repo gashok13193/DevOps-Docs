@@ -1,0 +1,64 @@
+# ============================================
+# ArgoCD Application - Staging Environment
+# ============================================
+
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: devops-java-app-staging
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: devops-java-app
+    app.kubernetes.io/environment: staging
+    app.kubernetes.io/managed-by: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "20"
+    notifications.argoproj.io/subscribe.on-sync-succeeded.slack: devops-alerts
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  
+  source:
+    repoURL: https://github.com/your-org/devops-java-app.git
+    targetRevision: main
+    path: helm/devops-java-app
+    
+    helm:
+      valueFiles:
+        - values.yaml
+        - values-staging.yaml
+      
+      parameters:
+        - name: image.tag
+          value: "1.0.0"  # Updated by CI pipeline
+        - name: app.environment
+          value: "staging"
+        - name: replicaCount
+          value: "2"
+  
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: devops-staging
+  
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ApplyOutOfSyncOnly=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 10s
+        factor: 2
+        maxDuration: 3m
+  
+  ignoreDifferences:
+    - group: apps
+      kind: Deployment
+      jsonPointers:
+        - /spec/replicas
+  
+  revisionHistoryLimit: 10

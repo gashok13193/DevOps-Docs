@@ -1,0 +1,80 @@
+# ============================================
+# ArgoCD Application - Development Environment
+# ============================================
+# 
+# This application deploys the DevOps Java App to the development environment
+# 
+# Interview Questions:
+# 1. What is a Sync Wave in ArgoCD?
+# 2. How does ArgoCD handle Helm charts?
+# 3. What is the difference between inline values and valueFiles?
+
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: devops-java-app-dev
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: devops-java-app
+    app.kubernetes.io/environment: development
+    app.kubernetes.io/managed-by: argocd
+  # Annotations for sync waves (order of deployment)
+  annotations:
+    argocd.argoproj.io/sync-wave: "10"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  
+  # Helm chart source
+  source:
+    repoURL: https://github.com/your-org/devops-java-app.git
+    targetRevision: main
+    path: helm/devops-java-app
+    
+    # Helm configuration
+    helm:
+      # Use environment-specific values file
+      valueFiles:
+        - values.yaml
+        - values-dev.yaml
+      
+      # Additional parameter overrides
+      parameters:
+        - name: image.tag
+          value: "latest"
+        - name: app.environment
+          value: "development"
+      
+      # Skip CRD installation (if using pre-installed CRDs)
+      skipCrds: false
+  
+  # Destination cluster and namespace
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: devops-dev
+  
+  # Sync policy
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ApplyOutOfSyncOnly=true
+    retry:
+      limit: 3
+      backoff:
+        duration: 10s
+        factor: 2
+        maxDuration: 2m
+  
+  # Ignore differences in specific fields (useful for Helm)
+  ignoreDifferences:
+    - group: apps
+      kind: Deployment
+      jsonPointers:
+        - /spec/replicas
+  
+  # Health checks
+  revisionHistoryLimit: 10

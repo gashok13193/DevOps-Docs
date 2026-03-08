@@ -1,0 +1,161 @@
+# ============================================
+# ArgoCD ApplicationSet - Multi-Environment Generator
+# ============================================
+# 
+# ApplicationSet generates multiple Applications from a template
+# This is an alternative to manually creating separate Application files
+# 
+
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: devops-java-app-environments
+  namespace: argocd
+spec:
+  # Generator: Creates applications for each environment
+  generators:
+    - list:
+        elements:
+          - environment: dev
+            namespace: devops-dev
+            cluster: https://kubernetes.default.svc
+            replicaCount: "1"
+            resources:
+              cpu: "500m"
+              memory: "512Mi"
+            syncPolicy: "automated"
+            
+          - environment: staging
+            namespace: devops-staging
+            cluster: https://kubernetes.default.svc
+            replicaCount: "2"
+            resources:
+              cpu: "1000m"
+              memory: "1Gi"
+            syncPolicy: "automated"
+            
+          - environment: prod
+            namespace: devops-prod
+            cluster: https://production-cluster.company.com:6443
+            replicaCount: "3"
+            resources:
+              cpu: "2000m"
+              memory: "2Gi"
+            syncPolicy: "manual"
+  
+  # Template: Used to generate each Application
+  template:
+    metadata:
+      name: 'devops-java-app-{{environment}}'
+      labels:
+        app.kubernetes.io/name: devops-java-app
+        app.kubernetes.io/environment: '{{environment}}'
+      annotations:
+        argocd.argoproj.io/manifest-generate-paths: .
+    spec:
+      project: default
+      
+      source:
+        repoURL: https://github.com/your-org/devops-java-app.git
+        targetRevision: main
+        path: helm/devops-java-app
+        
+        helm:
+          valueFiles:
+            - values.yaml
+            - 'values-{{environment}}.yaml'
+          parameters:
+            - name: replicaCount
+              value: '{{replicaCount}}'
+            - name: app.environment
+              value: '{{environment}}'
+      
+      destination:
+        server: '{{cluster}}'
+        namespace: '{{namespace}}'
+      
+      syncPolicy:
+        syncOptions:
+          - CreateNamespace=true
+  
+  # Sync policy for the ApplicationSet itself
+  syncPolicy:
+    preserveResourcesOnDeletion: false
+
+---
+# ============================================
+# ApplicationSet with Git Generator
+# ============================================
+# Generates applications based on directory structure in Git
+
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: devops-apps-git-generator
+  namespace: argocd
+spec:
+  generators:
+    # Git Directory Generator
+    - git:
+        repoURL: https://github.com/your-org/gitops-repo.git
+        revision: main
+        directories:
+          - path: applications/*
+  
+  template:
+    metadata:
+      name: '{{path.basename}}'
+    spec:
+      project: default
+      source:
+        repoURL: https://github.com/your-org/gitops-repo.git
+        targetRevision: main
+        path: '{{path}}'
+      destination:
+        server: https://kubernetes.default.svc
+        namespace: '{{path.basename}}'
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        syncOptions:
+          - CreateNamespace=true
+
+---
+# ============================================
+# ApplicationSet with Cluster Generator
+# ============================================
+# Deploys the same app to multiple clusters
+
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: devops-java-app-multi-cluster
+  namespace: argocd
+spec:
+  generators:
+    # Cluster Generator - deploys to all registered clusters
+    - clusters:
+        selector:
+          matchLabels:
+            environment: production
+  
+  template:
+    metadata:
+      name: 'devops-java-app-{{name}}'
+    spec:
+      project: default
+      source:
+        repoURL: https://github.com/your-org/devops-java-app.git
+        targetRevision: main
+        path: helm/devops-java-app
+        helm:
+          valueFiles:
+            - values-prod.yaml
+      destination:
+        server: '{{server}}'
+        namespace: devops-prod
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true

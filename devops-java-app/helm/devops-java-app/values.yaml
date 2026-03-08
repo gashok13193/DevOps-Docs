@@ -1,0 +1,265 @@
+# ============================================
+# Default Values for DevOps Java Application
+# ============================================
+# 
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+#
+# Interview Questions:
+# 1. How do you override values in Helm?
+# 2. What is values.yaml vs values-prod.yaml?
+# 3. How to handle secrets in Helm charts?
+# 4. What is the difference between --set and -f flags?
+
+# ===========================================
+# Application Configuration
+# ===========================================
+app:
+  name: devops-java-app
+  environment: development
+
+# ===========================================
+# Replica Configuration
+# ===========================================
+replicaCount: 2
+
+# ===========================================
+# Image Configuration
+# ===========================================
+image:
+  repository: registry.company.com/devops-java-app
+  # Tag will be updated by CI/CD pipeline
+  tag: "1.0.0"
+  pullPolicy: IfNotPresent
+
+# Image pull secrets for private registry
+imagePullSecrets:
+  - name: registry-credentials
+
+# ===========================================
+# Service Account Configuration
+# ===========================================
+serviceAccount:
+  # Specifies whether a service account should be created
+  create: true
+  # Annotations to add to the service account
+  annotations: {}
+  # The name of the service account to use
+  name: ""
+
+# ===========================================
+# Pod Configuration
+# ===========================================
+podAnnotations:
+  prometheus.io/scrape: "true"
+  prometheus.io/port: "8080"
+  prometheus.io/path: "/actuator/prometheus"
+
+podLabels:
+  app: devops-java-app
+  team: devops
+
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  runAsGroup: 1000
+  fsGroup: 1000
+
+securityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: false
+  capabilities:
+    drop:
+      - ALL
+
+# ===========================================
+# Service Configuration
+# ===========================================
+service:
+  type: ClusterIP
+  port: 80
+  targetPort: 8080
+  annotations: {}
+
+# ===========================================
+# Ingress Configuration
+# ===========================================
+ingress:
+  enabled: true
+  className: nginx
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-body-size: "10m"
+    nginx.ingress.kubernetes.io/proxy-connect-timeout: "60"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "60"
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+  hosts:
+    - host: devops-app.company.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: devops-app-tls
+      hosts:
+        - devops-app.company.com
+
+# ===========================================
+# Resource Configuration
+# ===========================================
+resources:
+  requests:
+    cpu: 250m
+    memory: 512Mi
+  limits:
+    cpu: 1000m
+    memory: 1Gi
+
+# ===========================================
+# Autoscaling Configuration
+# ===========================================
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 70
+  targetMemoryUtilizationPercentage: 80
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      policies:
+        - type: Percent
+          value: 10
+          periodSeconds: 60
+    scaleUp:
+      stabilizationWindowSeconds: 0
+      policies:
+        - type: Percent
+          value: 100
+          periodSeconds: 15
+
+# ===========================================
+# Probe Configuration
+# ===========================================
+livenessProbe:
+  httpGet:
+    path: /actuator/health/liveness
+    port: 8080
+  initialDelaySeconds: 60
+  periodSeconds: 10
+  timeoutSeconds: 5
+  failureThreshold: 3
+  successThreshold: 1
+
+readinessProbe:
+  httpGet:
+    path: /actuator/health/readiness
+    port: 8080
+  initialDelaySeconds: 30
+  periodSeconds: 10
+  timeoutSeconds: 5
+  failureThreshold: 3
+  successThreshold: 1
+
+startupProbe:
+  httpGet:
+    path: /actuator/health
+    port: 8080
+  initialDelaySeconds: 10
+  periodSeconds: 5
+  timeoutSeconds: 3
+  failureThreshold: 30
+
+# ===========================================
+# Environment Variables
+# ===========================================
+env:
+  - name: SPRING_PROFILES_ACTIVE
+    value: "default"
+  - name: SERVER_PORT
+    value: "8080"
+  - name: TZ
+    value: "UTC"
+
+# Environment variables from secrets
+envFromSecrets:
+  - name: DATABASE_URL
+    secretName: app-database-secret
+    secretKey: url
+  - name: DATABASE_USERNAME
+    secretName: app-database-secret
+    secretKey: username
+  - name: DATABASE_PASSWORD
+    secretName: app-database-secret
+    secretKey: password
+
+# ===========================================
+# ConfigMap Configuration
+# ===========================================
+configMap:
+  enabled: true
+  data:
+    application.properties: |
+      # Additional application properties
+      logging.level.root=INFO
+
+# ===========================================
+# Persistence Configuration
+# ===========================================
+persistence:
+  enabled: false
+  accessMode: ReadWriteOnce
+  size: 1Gi
+  storageClass: ""
+  mountPath: /data
+
+# ===========================================
+# Node Selection
+# ===========================================
+nodeSelector: {}
+
+tolerations: []
+
+affinity:
+  podAntiAffinity:
+    preferredDuringSchedulingIgnoredDuringExecution:
+      - weight: 100
+        podAffinityTerm:
+          labelSelector:
+            matchLabels:
+              app: devops-java-app
+          topologyKey: kubernetes.io/hostname
+
+# ===========================================
+# Pod Disruption Budget
+# ===========================================
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1
+  # maxUnavailable: 1
+
+# ===========================================
+# Network Policy
+# ===========================================
+networkPolicy:
+  enabled: false
+  ingress: []
+  egress: []
+
+# ===========================================
+# Service Monitor (Prometheus)
+# ===========================================
+serviceMonitor:
+  enabled: true
+  interval: 30s
+  scrapeTimeout: 10s
+  labels:
+    release: prometheus
+
+# ===========================================
+# Database Configuration (if using embedded)
+# ===========================================
+postgresql:
+  enabled: false
+  auth:
+    database: devopsdb
+    username: devops
+    existingSecret: postgresql-secret

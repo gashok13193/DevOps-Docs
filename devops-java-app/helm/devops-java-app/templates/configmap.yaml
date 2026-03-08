@@ -1,0 +1,25 @@
+{{/*
+============================================
+Kubernetes ConfigMap Template
+============================================
+
+Interview Questions:
+1. What is a ConfigMap and how is it different from Secrets?
+2. How can you mount ConfigMaps in pods?
+3. What happens when you update a ConfigMap?
+4. What are the size limitations of ConfigMaps?
+*/}}
+
+{{- if .Values.configMap.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "devops-java-app.fullname" . }}-config
+  labels:
+    {{- include "devops-java-app.labels" . | nindent 4 }}
+data:
+  {{- range $key, $value := .Values.configMap.data }}
+  {{ $key }}: |
+{{ $value | indent 4 }}
+  {{- end }}
+{{- end }}
