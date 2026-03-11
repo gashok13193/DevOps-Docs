@@ -1,0 +1,353 @@
+Kubernetes Interview Questions
+1️⃣ Pod Scheduling Failure in Multi-AZ Cluster
+
+Question
+
+You have a 3-AZ Kubernetes cluster.
+A StatefulSet pod is stuck in Pending with this error:
+
+0/12 nodes are available: 
+3 node(s) had volume node affinity conflict,
+5 node(s) didn't match node selector,
+4 node(s) had taints.
+
+How would you troubleshoot and fix this?
+
+What interviewer expects
+
+Steps:
+
+Check pod events
+
+kubectl describe pod <pod-name>
+
+Check PVC node affinity
+
+kubectl describe pv <pv-name>
+
+Check node labels
+
+kubectl get nodes --show-labels
+
+Check taints
+
+kubectl describe node <node>
+
+Possible fixes
+
+Adjust nodeSelector
+
+Add tolerations
+
+Ensure PVC zone matches node zone
+
+Modify topologySpreadConstraints
+
+2️⃣ etcd Failure Scenario
+
+Question
+
+Your etcd leader crashes in a 3-node control plane cluster.
+What happens and how does Kubernetes recover?
+
+Answer
+
+etcd uses RAFT consensus
+
+Remaining nodes elect new leader
+
+Requires quorum (2/3 nodes)
+
+If only 1 node remains:
+
+cluster becomes read-only
+
+writes fail
+
+Recovery:
+
+Restore from snapshot
+
+etcdctl snapshot restore snapshot.db
+
+Rebuild cluster
+
+3️⃣ HPA Not Scaling Pods
+
+Question
+
+Your HPA is configured, but pods are not scaling even though CPU is high.
+
+What could be wrong?
+
+Possible issues
+
+Metrics server missing
+
+kubectl top pods
+
+Wrong resource requests
+
+Example:
+
+cpu request = 2 cores
+actual usage = 1 core
+
+HPA sees 50% usage, so no scaling.
+
+Wrong metric type
+
+targetAverageUtilization
+
+Custom metrics misconfiguration
+
+4️⃣ Kubernetes Networking Deep Question
+
+Question
+
+How can pods communicate across nodes without NAT in Kubernetes?
+
+Answer
+
+Kubernetes uses CNI plugins that implement flat networking.
+
+Example CNIs:
+
+Calico
+
+Cilium
+
+Flannel
+
+Each pod gets:
+
+unique IP
+
+Routing happens via:
+
+overlay network
+
+BGP
+
+eBPF
+
+Example:
+
+Pod A (Node1) → Pod B (Node2)
+
+Packet routed directly via CNI.
+
+5️⃣ Rolling Update Failure
+
+Question
+
+During a deployment rollout, new pods keep crashing and rollout stops.
+
+How do you debug and rollback safely?
+
+Answer
+
+Check rollout status:
+
+kubectl rollout status deployment app
+
+Check logs:
+
+kubectl logs <pod>
+
+Rollback:
+
+kubectl rollout undo deployment app
+
+Check revision history:
+
+kubectl rollout history deployment app
+6️⃣ Kubernetes Scheduler Internals
+
+Question
+
+Explain how Kubernetes scheduler decides where a pod runs.
+
+Answer
+
+Scheduling pipeline:
+
+1️⃣ Filtering
+
+Nodes that satisfy requirements:
+
+CPU
+
+Memory
+
+nodeSelector
+
+affinity
+
+2️⃣ Scoring
+
+Nodes scored by:
+
+resource availability
+
+spread
+
+affinity rules
+
+3️⃣ Binding
+
+Scheduler binds pod to best node.
+
+7️⃣ Pod Eviction Scenario
+
+Question
+
+A node runs out of memory.
+Which pods get killed first?
+
+Answer
+
+Based on QoS classes.
+
+Priority order:
+
+1️⃣ BestEffort (killed first)
+2️⃣ Burstable
+3️⃣ Guaranteed (killed last)
+
+QoS example:
+
+Guaranteed → requests == limits
+8️⃣ Multi-Cluster Kubernetes Architecture
+
+Question
+
+You manage 100 Kubernetes clusters across multiple regions.
+
+How would you manage deployments?
+
+Expected answer
+
+Use GitOps + central control.
+
+Tools:
+
+ArgoCD
+
+Flux
+
+Rancher
+
+Cluster API
+
+Architecture:
+
+Git Repo
+   ↓
+ArgoCD
+   ↓
+Multiple clusters
+9️⃣ Kubernetes Storage Deep Scenario
+
+Question
+
+A StatefulSet pod cannot start because PVC is bound to a different zone.
+
+Why does this happen?
+
+Answer
+
+Because of topology aware storage.
+
+Example:
+
+PV zone = us-east-1a
+Node zone = us-east-1b
+
+Kubernetes prevents attach.
+
+Solution:
+
+use WaitForFirstConsumer
+
+use topology aware provisioning
+
+🔟 Kubernetes API Server Overload
+
+Question
+
+Your API server is overloaded and kubectl commands are slow.
+
+How do you troubleshoot?
+
+Answer
+
+Check:
+
+kubectl get --raw /metrics
+
+Common causes:
+
+Too many controllers
+
+High watch traffic
+
+Poor CRD design
+
+Solutions:
+
+enable API priority & fairness
+
+reduce polling
+
+optimize controllers
+
+1️⃣ Multi-Architecture Docker Images
+
+Question
+
+How can you build a Docker image that runs on both AMD64 and ARM64?
+
+Answer
+
+Use Docker Buildx.
+
+Example:
+
+docker buildx build \
+--platform linux/amd64,linux/arm64 \
+-t myrepo/app:latest \
+--push .
+
+This creates a multi-arch manifest.
+
+Image
+ ├── AMD64 layer
+ └── ARM64 layer
+
+Docker automatically pulls the correct one.
+
+2️⃣ Running Multi-Arch Images in Kubernetes
+
+Question
+
+You deploy a container image built for amd64, but a node runs arm64. What happens?
+
+Answer
+
+Pod will fail with:
+
+exec format error
+
+Fix:
+
+1️⃣ Build multi-arch image
+
+2️⃣ Use:
+
+docker manifest inspect image
+
+3️⃣ Or restrict nodes:
+
+nodeSelector:
+  kubernetes.io/arch: amd64
