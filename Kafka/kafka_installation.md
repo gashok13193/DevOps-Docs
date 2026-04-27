@@ -45,7 +45,6 @@ sudo tar -xzf kafka_2.13-4.2.0.tgz
 
 ```bash
 sudo mv kafka_2.13-4.2.0 kafka
-sudo chown -R $USER:$USER /opt/kafka
 cd /opt/kafka
 ```
 
@@ -64,7 +63,7 @@ KAFKA_CLUSTER_ID="$(bin/kafka-storage.sh random-uuid)"
 This applies your cluster ID to the KRaft configuration.
 
 ```bash
-bin/kafka-storage.sh format -t $KAFKA_CLUSTER_ID -c config/kraft/server.properties
+bin/kafka-storage.sh format -t $KAFKA_CLUSTER_ID -c config/server.properties
 ```
 
 ## Phase 4: Start the Kafka Server
@@ -72,7 +71,7 @@ bin/kafka-storage.sh format -t $KAFKA_CLUSTER_ID -c config/kraft/server.properti
 ### 1) Start the Kafka broker as a daemon
 
 ```bash
-bin/kafka-server-start.sh -daemon config/kraft/server.properties
+bin/kafka-server-start.sh -daemon config/server.properties
 ```
 
 ### 2) Verify Kafka is running
