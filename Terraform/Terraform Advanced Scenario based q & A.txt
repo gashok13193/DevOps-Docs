@@ -1,0 +1,267 @@
+🔥 15 Advanced Scenario-Based Terraform Questions + Answers (2025 Edition)
+
+(These are NOT basic questions—these are real-world scenarios faced in production environments.)
+
+1️⃣ Scenario: Two developers are updating the same Terraform module and running terraform apply at the same time. What will happen and how do you prevent corruption?
+Answer:
+
+If both run apply simultaneously:
+
+The first one gets the state lock
+
+The second gets a lock error:
+
+Error: Error acquiring the state lock
+
+
+Solution:
+
+Use Remote Backend with state locking enabled:
+
+AWS S3 + DynamoDB
+
+Terraform Cloud
+
+Consul
+
+Best Practice:
+Use CI/CD pipeline and block local applies.
+
+2️⃣ Scenario: You change the AMI ID in a Launch Template using Terraform, and Terraform wants to destroy and recreate the entire Auto Scaling Group. How do you force zero downtime?
+Answer:
+
+Use:
+
+lifecycle {
+  create_before_destroy = true
+}
+
+
+Also enable:
+
+ignore_changes = [latest_version]
+
+
+Why?
+ASG forces replacement for template updates.
+create_before_destroy ensures new infra launches before old dies.
+
+3️⃣ Scenario: Terraform is trying to recreate an entire RDS database because a minor parameter changed. But you MUST avoid downtime. What do you do?
+Answer:
+
+Use:
+
+lifecycle {
+  ignore_changes = [parameter_group_name]
+}
+
+
+OR
+Move the change to DB parameter group instead of DB instance.
+
+4️⃣ Scenario: You imported an EC2 instance using terraform import, but every plan shows changes even though nothing changed in AWS. Why?
+Answer:
+
+Because import only syncs state, NOT code.
+
+Fix:
+
+Run terraform show
+
+Copy actual attributes
+
+Modify resource block to match 100%
+
+Run plan until it is clean
+
+5️⃣ Scenario: Terraform marks a resource as tainted automatically, and keeps recreating it on every apply. How do you find the cause?
+Answer:
+
+Run:
+
+terraform state show <resource>
+
+
+Reasons:
+
+Drift in cloud
+
+Missing attributes in code
+
+Provider bug
+
+Resource field is computed and changes each refresh
+
+Fix:
+Use:
+
+terraform apply -replace="aws_instance.example"
+
+6️⃣ Scenario: You have a module that deploys VPCs for dev, stage, prod. Dev/stage use 2 subnets, prod uses 6. How do you design the module?
+Answer:
+
+Use for_each + dynamic blocks:
+
+variable "subnets" {
+  type = map(list(string))
+}
+
+resource "aws_subnet" "this" {
+  for_each = toset(var.subnets[var.env])
+}
+
+
+Avoid count because reorder = recreation.
+
+7️⃣ Scenario: You want to deploy the same infra across 10 AWS accounts using one code base. How do you design it?
+Answer:
+
+Use multi-provider configuration:
+
+provider "aws" {
+  alias  = "acc1"
+  region = "ap-south-1"
+}
+
+provider "aws" {
+  alias  = "acc2"
+  region = "eu-west-1"
+}
+
+
+Call module with provider override:
+
+module "network_acc1" {
+  source   = "./network"
+  providers = { aws = aws.acc1 }
+}
+
+
+Use STS AssumeRole for secure access.
+
+8️⃣ Scenario: Your terraform plan is very slow because it queries thousands of resources. How do you optimize?
+Answer:
+
+Use lifecycle ignore_changes
+
+Use data sources ONLY when required
+
+Break the project into multiple state files using:
+
+Terragrunt
+
+Multiple root modules
+
+Remote state references
+
+9️⃣ Scenario: You have a sensitive variable but someone added it to Git. How do you avoid this forever?
+Answer:
+
+Use:
+
+variable "password" {
+  type      = string
+  sensitive = true
+}
+
+
+AND add:
+
+.gitignore for terraform.tfvars
+
+Pre-commit hook
+
+Vault provider
+
+SSM Parameter Store
+
+🔟 Scenario: Terraform wants to recreate your ALB every time because AWS adds default tags dynamically.
+Answer:
+
+Ignore AWS-managed tags:
+
+lifecycle {
+  ignore_changes = [tags]
+}
+
+
+Common for EKS, ALB, EC2, S3.
+
+1️⃣1️⃣ Scenario: You want to share outputs from one Terraform project to another. How do you do it?
+Answer:
+
+Use Remote State Data Source:
+
+data "terraform_remote_state" "vpc" {
+  backend = "s3"
+  config = {
+    bucket = "tf-state"
+    key    = "vpc/terraform.tfstate"
+    region = "ap-south-1"
+  }
+}
+
+
+Then:
+
+vpc_id = data.terraform_remote_state.vpc.outputs.vpc_id
+
+1️⃣2️⃣ Scenario: Your Terraform destroy is stuck because RDS has final snapshots enabled.
+Answer:
+
+Add:
+
+skip_final_snapshot = true
+
+
+or:
+
+final_snapshot_identifier = "backup-before-destroy"
+
+1️⃣3️⃣ Scenario: Terraform keeps recreating an S3 bucket because bucket ACL or ownership is changed by AWS.
+Answer:
+lifecycle {
+  ignore_changes = [
+    acl,
+    grant,
+    object_ownership
+  ]
+}
+
+
+This is extremely common after AWS introduced S3 Object Ownership defaults.
+
+1️⃣4️⃣ Scenario: Terraform tries to delete a resource, but it is attached to something else (e.g., ENI, IAM role). How do you fix cyclic dependency?
+Answer:
+
+Use:
+
+depends_on = [
+  aws_iam_role_policy.this,
+  aws_security_group.this
+]
+
+
+Or split into separate apply phases.
+
+1️⃣5️⃣ Scenario: You have 10 environment folders (dev → prod), but code duplication is high. How do you fix this?
+Answer:
+
+Use Terragrunt:
+
+/live/dev/network/terragrunt.hcl
+/live/prod/network/terragrunt.hcl
+/modules/network/main.tf
+
+
+Terragrunt automates:
+
+remote state
+
+locking
+
+backend config
+
+environment variables
+
+DRY structure
