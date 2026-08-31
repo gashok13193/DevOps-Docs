@@ -77,8 +77,10 @@ function stopAll(nextStatusText) {
 
 // While connected to a real live stream, if no real chat message has arrived for
 // IDLE_THRESHOLD_MS, inject occasional demo-like comment/subscribe/like events so the
-// board keeps showing activity instead of looking dead during quiet stretches:
-// a brand-new "newcomer" commenter every 30s, and a subscriber every 45 minutes.
+// board keeps showing activity instead of looking dead during quiet stretches: a filler
+// commenter every 30s (reusing a small identity pool so their comment counts can build up
+// toward real milestones, occasionally introducing a genuinely new one-off "newcomer"),
+// and a subscriber every 45 minutes.
 function startIdleFiller() {
   stopIdleFiller();
 
@@ -86,13 +88,16 @@ function startIdleFiller() {
     if (session.mode !== 'live') return;
     if (Date.now() - lastChatActivity < IDLE_THRESHOLD_MS) return;
     const country = COUNTRIES[Math.floor(Math.random() * COUNTRIES.length)];
-    const base = FILLER_NAMES[Math.floor(Math.random() * FILLER_NAMES.length)].split('-')[0];
-    const suffix = Math.random().toString(36).slice(2, 5);
-    const name = `${base}-${suffix}`;
+    // Mostly reuse the fixed pool (so comment counts accumulate toward milestones); occasionally
+    // spawn a genuinely new one-off identity to represent an actual newcomer joining.
+    const isNewcomer = Math.random() < 0.2;
+    const name = isNewcomer
+      ? `Newcomer-${Math.random().toString(36).slice(2, 5)}`
+      : FILLER_NAMES[Math.floor(Math.random() * FILLER_NAMES.length)];
     if (Math.random() < 0.2) {
       GameState.addLikeBonus(1);
     } else {
-      GameState.addCommentPoint(country.code, `filler-${name}`, name); // unique id each time = a fresh "newcomer"
+      GameState.addCommentPoint(country.code, `filler-${name}`, name);
     }
     checkForWinAndReset();
   }, 30 * 1000);
@@ -125,11 +130,23 @@ function startLiveInternal(cfg) {
     statusText: 'Connecting to live chat…',
   };
   startIdleFiller();
+  connectChat(cfg);
+}
+
+// Fetches a fresh liveChatId and (re)starts polling. Called again automatically if the
+// chat ID goes stale mid-stream (e.g. the broadcast briefly reconnected on YouTube's side),
+// if the stream hasn't gone live yet, or after a transient network/fetch failure — instead
+// of retrying forever with a dead connection.
+function connectChat(cfg) {
+  if (session.mode !== 'live') return; // user stopped/reset in the meantime
 
   YouTube.getVideoInfo(cfg.videoId).then(info => {
+    if (session.mode !== 'live') return;
     if (info.likeCount != null) GameState.setLastKnownLikeCount(info.likeCount);
+
     if (!info.liveChatId) {
       session.statusText = 'No active live chat found for this video. Is it live right now?';
+      setTimeout(() => connectChat(cfg), 15000);
       return;
     }
     session.statusText = '🟢 Connected — comment your country in chat!';
@@ -138,6 +155,14 @@ function startLiveInternal(cfg) {
       messages.forEach(handleChatMessage);
     }, err => {
       session.statusText = `⚠️ Chat error: ${err.message}`;
+      const staleOrUnreachable = /cannot be found|not found|ended|fetch failed/i.test(err.message || '');
+      if (staleOrUnreachable) {
+        // Stop the stale retry loop and fetch a brand-new chat ID instead of looping forever.
+        YouTube.stop();
+        YouTube.init(cfg.apiKey);
+        session.statusText = 'Reconnecting to live chat…';
+        setTimeout(() => connectChat(cfg), 8000);
+      }
     });
 
     YouTube.pollLikes(cfg.videoId, likeCount => {
@@ -146,8 +171,9 @@ function startLiveInternal(cfg) {
       GameState.setLastKnownLikeCount(likeCount);
     }, err => console.warn('Like poll error', err), 15000);
   }).catch(err => {
-    session.mode = 'idle';
-    session.statusText = `Setup error: ${err.message}`;
+    // Network hiccup fetching video info — retry rather than dropping into idle permanently.
+    session.statusText = `⚠️ Connection error: ${err.message}. Retrying…`;
+    setTimeout(() => connectChat(cfg), 10000);
   });
 }
 
