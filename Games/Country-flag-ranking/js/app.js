@@ -11,6 +11,7 @@
   const raceTrack = el('race-track');
   const targetValueEl = el('target-value');
   const leaderBanner = el('leader-banner');
+  const liveCommentaryEl = el('live-commentary');
   const neonTitle = el('neon-title');
   const titleEmojiLeft = el('title-emoji-left');
   const titleEmojiRight = el('title-emoji-right');
@@ -147,9 +148,47 @@
     bannerTimer = null;
   }
 
+  let liveCommentaryFacts = [];
+  let liveCommentaryTimer = null;
+  let liveCommentaryIndex = 0;
+
+  // Builds a fresh list of "who's leading / who subscribed / who's commenting" facts from
+  // the current state, so there's always something continuous to say even between events.
+  function buildLiveCommentaryFacts(sorted, events) {
+    const facts = [];
+    const leader = sorted[0];
+    if (leader) facts.push(`🏆 ${leader.name} is leading with ${leader.points} pts!`);
+    const second = sorted[1];
+    if (second) facts.push(`🥈 ${second.name} is in 2nd place with ${second.points} pts!`);
+    const third = sorted[2];
+    if (third) facts.push(`🥉 ${third.name} is in 3rd place with ${third.points} pts!`);
+    const nameOf = code => (sorted.find(c => c.code === code) || {}).name || (code || '').toUpperCase();
+    const lastSub = events.find(e => e.type === 'subscribe');
+    if (lastSub) facts.push(`🔔 ${lastSub.authorName || 'Someone'} subscribed for ${nameOf(lastSub.code)}!`);
+    const lastComment = events.find(e => e.type === 'comment');
+    if (lastComment) facts.push(`💬 ${lastComment.authorName || 'Someone'} commented for ${nameOf(lastComment.code)}!`);
+    return facts.length ? facts : ['💬 Comment your country to get on the board!'];
+  }
+
+  function startLiveCommentaryRotation() {
+    stopLiveCommentaryRotation();
+    liveCommentaryIndex = 0;
+    liveCommentaryTimer = setInterval(() => {
+      if (!liveCommentaryFacts.length) return;
+      liveCommentaryIndex = (liveCommentaryIndex + 1) % liveCommentaryFacts.length;
+      liveCommentaryEl.textContent = liveCommentaryFacts[liveCommentaryIndex];
+    }, 4000);
+  }
+
+  function stopLiveCommentaryRotation() {
+    if (liveCommentaryTimer) clearInterval(liveCommentaryTimer);
+    liveCommentaryTimer = null;
+  }
+
   function showSetup(errorMsg) {
     stopPolling();
     stopBannerRotation();
+    stopLiveCommentaryRotation();
     stopMelody();
     setupScreen.classList.remove('hidden');
     boardScreen.classList.add('hidden');
@@ -276,6 +315,10 @@
       : '<div class="ticker-item">Waiting for chat activity…</div>';
     renderRaceTrack(sorted);
 
+    liveCommentaryFacts = buildLiveCommentaryFacts(sorted, events);
+    if (liveCommentaryIndex >= liveCommentaryFacts.length) liveCommentaryIndex = 0;
+    liveCommentaryEl.textContent = liveCommentaryFacts[liveCommentaryIndex];
+
     const leader = sorted[0];
     if (leader) {
       const remaining = Math.max(0, targetScore - leader.points);
@@ -357,6 +400,7 @@
       lastSeenEventTs = 0;
       showBoard();
       startBannerRotation();
+      startLiveCommentaryRotation();
       startPolling();
       startMelody();
       speak('Game on! Comment your country to score points!');
@@ -379,6 +423,7 @@
       lastSeenEventTs = 0;
       showBoard();
       startBannerRotation();
+      startLiveCommentaryRotation();
       startPolling();
       startMelody();
       speak('Game on! Comment your country to score points!');
@@ -410,6 +455,7 @@
         targetScore = status.targetScore || 5000;
         showBoard();
         startBannerRotation();
+        startLiveCommentaryRotation();
         startPolling();
         // No button click happened on this device, so autoplay policies block audio until
         // the visitor taps something — show a one-time prompt to unlock sound/melody.

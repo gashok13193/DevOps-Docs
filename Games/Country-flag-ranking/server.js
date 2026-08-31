@@ -21,11 +21,10 @@ let session = {
   statusText: 'Not started yet.',
 };
 let demoTimerHandle = null;
-let idleFillerTimer = null;
+let idleCommentTimer = null;
+let idleSubscribeTimer = null;
 let lastChatActivity = Date.now();
-let lastFillerSubscribeTime = 0;
 const IDLE_THRESHOLD_MS = 30000;
-const FILLER_SUBSCRIBE_COOLDOWN_MS = 3 * 60 * 1000;
 const FILLER_NAMES = [
   'Fan92-k9s', 'ViewerX-d7w', 'StreamBuddy-w6e', 'NightOwl-t2f',
   'ChatRider-q8m', 'PixelFan-r5j', 'QuickClap-b3n', 'GameLover-h9x',
@@ -78,31 +77,41 @@ function stopAll(nextStatusText) {
 
 // While connected to a real live stream, if no real chat message has arrived for
 // IDLE_THRESHOLD_MS, inject occasional demo-like comment/subscribe/like events so the
-// board keeps showing activity instead of looking dead during quiet stretches.
+// board keeps showing activity instead of looking dead during quiet stretches:
+// a brand-new "newcomer" commenter every 30s, and a subscriber every 45 minutes.
 function startIdleFiller() {
   stopIdleFiller();
-  idleFillerTimer = setInterval(() => {
+
+  idleCommentTimer = setInterval(() => {
+    if (session.mode !== 'live') return;
+    if (Date.now() - lastChatActivity < IDLE_THRESHOLD_MS) return;
+    const country = COUNTRIES[Math.floor(Math.random() * COUNTRIES.length)];
+    const base = FILLER_NAMES[Math.floor(Math.random() * FILLER_NAMES.length)].split('-')[0];
+    const suffix = Math.random().toString(36).slice(2, 5);
+    const name = `${base}-${suffix}`;
+    if (Math.random() < 0.2) {
+      GameState.addLikeBonus(1);
+    } else {
+      GameState.addCommentPoint(country.code, `filler-${name}`, name); // unique id each time = a fresh "newcomer"
+    }
+    checkForWinAndReset();
+  }, 30 * 1000);
+
+  idleSubscribeTimer = setInterval(() => {
     if (session.mode !== 'live') return;
     if (Date.now() - lastChatActivity < IDLE_THRESHOLD_MS) return;
     const country = COUNTRIES[Math.floor(Math.random() * COUNTRIES.length)];
     const name = FILLER_NAMES[Math.floor(Math.random() * FILLER_NAMES.length)];
-    const roll = Math.random();
-    const canSubscribe = Date.now() - lastFillerSubscribeTime >= FILLER_SUBSCRIBE_COOLDOWN_MS;
-    if (roll < 0.1 && canSubscribe) {
-      GameState.addSubscribeBonus(country.code, name, `filler-${name}`);
-      lastFillerSubscribeTime = Date.now();
-    } else if (roll < 0.3) {
-      GameState.addLikeBonus(1);
-    } else {
-      GameState.addCommentPoint(country.code, `filler-${name}`, name);
-    }
+    GameState.addSubscribeBonus(country.code, name, `filler-${name}`);
     checkForWinAndReset();
-  }, 4000);
+  }, 45 * 60 * 1000);
 }
 
 function stopIdleFiller() {
-  if (idleFillerTimer) clearInterval(idleFillerTimer);
-  idleFillerTimer = null;
+  if (idleCommentTimer) clearInterval(idleCommentTimer);
+  if (idleSubscribeTimer) clearInterval(idleSubscribeTimer);
+  idleCommentTimer = null;
+  idleSubscribeTimer = null;
 }
 
 function startLiveInternal(cfg) {
