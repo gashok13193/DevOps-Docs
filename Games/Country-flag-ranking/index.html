@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+<title>Country Flag Ranking - Live</title>
+<link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+
+  <!-- Setup screen -->
+  <section id="setup-screen" class="screen">
+    <div class="setup-card">
+      <h1>🌍 Country Flag Ranking</h1>
+      <p class="hint">Connect this to your YouTube live stream. Comments with a country name score +1, a subscribe keyword scores +100, and rising video likes add a global bonus.</p>
+
+      <label>YouTube API Key
+        <input id="input-api-key" type="text" placeholder="AIza..." autocomplete="off" />
+      </label>
+
+      <label>Live Video URL or ID
+        <input id="input-video-id" type="text" placeholder="https://youtube.com/watch?v=... or video ID" autocomplete="off" />
+      </label>
+
+      <label>Subscribe keyword(s) <span class="hint-small">(comma separated, case-insensitive)</span>
+        <input id="input-sub-keywords" type="text" value="subscribed, sub" />
+      </label>
+
+      <label>Starting points per country
+        <input id="input-start-points" type="number" value="1000" min="0" />
+      </label>
+
+      <label>Target score <span class="hint-small">(race goal shown on the race bar)</span>
+        <input id="input-target-score" type="number" value="3700" min="1" />
+      </label>
+
+      <div class="setup-actions">
+        <button id="btn-start" class="btn primary">Start Live Board</button>
+        <button id="btn-demo" class="btn secondary">Try Demo Mode (no API key)</button>
+      </div>
+
+      <p id="setup-error" class="error"></p>
+      <p class="hint-small">Need an API key? See <code>README.md</code> in this project folder for step-by-step setup.</p>
+    </div>
+  </section>
+
+  <!-- Board screen -->
+  <section id="board-screen" class="screen hidden">
+    <header class="board-header">
+      <div class="title-row">
+        <span class="live-dot"></span>
+        <h1>Comment Your Country!</h1>
+        <button id="btn-settings" class="icon-btn" title="Settings">⚙️</button>
+      </div>
+      <div class="banner-row">
+        <span id="sub-banner" class="sub-banner">Subscribe = +100 Points</span>
+        <span class="target-badge">TARGET<br /><span id="target-value">0</span></span>
+      </div>
+      <div id="leader-banner" class="leader-banner">🏆 Waiting for votes…</div>
+      <div id="race-track" class="race-track">
+        <div class="race-finish"></div>
+      </div>
+      <div class="status-row">
+        <span id="status-text">Connecting…</span>
+        <span id="bonus-badge" class="bonus-badge">❤️ Bonus: 0</span>
+      </div>
+      <div id="ticker" class="ticker"></div>
+    </header>
+
+    <main id="flag-grid" class="flag-grid"></main>
+  </section>
+
+  <script src="js/countries.js"></script>
+  <script src="js/scoring.js"></script>
+  <script src="js/youtube.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>

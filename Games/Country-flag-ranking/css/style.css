@@ -1,0 +1,194 @@
+* { box-sizing: border-box; }
+html, body {
+  margin: 0; padding: 0;
+  width: 100%; height: 100%;
+  background: #2b0f3a;
+  color: #fff;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
+  overflow-x: hidden;
+}
+
+.screen { min-height: 100vh; width: 100%; }
+.hidden { display: none !important; }
+
+/* ---------- Setup screen ---------- */
+#setup-screen {
+  display: flex; align-items: center; justify-content: center;
+  padding: 24px;
+}
+.setup-card {
+  width: 100%; max-width: 420px;
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 16px;
+  padding: 24px;
+}
+.setup-card h1 { font-size: 22px; margin: 0 0 8px; }
+.hint { font-size: 13px; color: #d8c8e6; line-height: 1.4; margin-bottom: 18px; }
+.hint-small { font-size: 11px; color: #b79fc9; font-weight: normal; }
+.setup-card label {
+  display: block; font-size: 13px; color: #e6dcef; margin-bottom: 14px; font-weight: 600;
+}
+.setup-card input {
+  display: block; width: 100%; margin-top: 6px;
+  padding: 10px 12px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.2);
+  background: rgba(0,0,0,0.25); color: #fff; font-size: 14px; font-weight: normal;
+}
+.setup-actions { display: flex; flex-direction: column; gap: 10px; margin-top: 8px; }
+.btn {
+  padding: 12px; border-radius: 10px; border: none; font-size: 15px; font-weight: 700;
+  cursor: pointer;
+}
+.btn.primary { background: linear-gradient(135deg, #ff5da2, #ff8a00); color: #1a0526; }
+.btn.secondary { background: rgba(255,255,255,0.12); color: #fff; }
+.error { color: #ff8080; font-size: 13px; min-height: 18px; margin: 10px 0 0; }
+
+/* ---------- Board screen ---------- */
+.board-header {
+  position: sticky; top: 0; z-index: 5;
+  background: linear-gradient(180deg, #3a1250, #2b0f3a 90%);
+  padding: 10px 12px 8px;
+  border-bottom: 2px solid rgba(255,255,255,0.15);
+}
+.title-row { display: flex; align-items: center; gap: 8px; }
+.title-row h1 { font-size: 16px; margin: 0; flex: 1; font-weight: 800; letter-spacing: 0.3px; }
+.live-dot {
+  width: 10px; height: 10px; border-radius: 50%; background: #ff3b3b;
+  box-shadow: 0 0 8px #ff3b3b; animation: pulse 1.4s infinite;
+}
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+.icon-btn { background: none; border: none; font-size: 18px; cursor: pointer; color: #fff; }
+
+.banner-row {
+  display: flex; align-items: center; gap: 8px; margin-top: 6px;
+}
+.sub-banner {
+  flex: 1;
+  background: linear-gradient(135deg, #ff2fb0, #7a2cff);
+  color: #fff; text-align: center;
+  font-size: 15px; font-weight: 800;
+  padding: 8px 6px; border-radius: 10px;
+  box-shadow: 0 2px 0 rgba(0,0,0,0.25);
+}
+.target-badge {
+  background: #ffcf33; color: #402800;
+  font-size: 9px; font-weight: 800; text-align: center; line-height: 1.2;
+  padding: 5px 10px; border-radius: 8px; white-space: nowrap;
+}
+.target-badge #target-value { font-size: 14px; }
+
+.leader-banner {
+  margin-top: 6px;
+  text-align: center;
+  font-size: 12px; font-weight: 800;
+  color: #402800;
+  background: linear-gradient(135deg, #ffe08a, #ffb400);
+  border-radius: 8px;
+  padding: 5px 8px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+
+.race-track {
+  position: relative;
+  height: 62px;
+  margin-top: 10px;
+  background: rgba(0,0,0,0.25);
+  border-radius: 8px;
+  border: 1px solid rgba(255,255,255,0.15);
+  overflow: hidden;
+}
+.race-finish {
+  position: absolute; top: 0; right: 6px; bottom: 0;
+  width: 2px; background: repeating-linear-gradient(180deg, #ffcf33 0 6px, transparent 6px 12px);
+}
+.race-marker {
+  position: absolute; top: 4px;
+  transform: translateX(-50%);
+  display: flex; flex-direction: column; align-items: center;
+  transition: left 0.6s ease;
+}
+.race-marker img {
+  width: 26px; height: 18px; object-fit: cover; border-radius: 2px;
+  border: 1px solid rgba(255,255,255,0.5);
+}
+.race-marker .race-rank {
+  font-size: 9px; font-weight: 800; color: #ffe08a; margin-top: 2px;
+  white-space: nowrap; max-width: 70px; overflow: hidden; text-overflow: ellipsis;
+}
+.race-marker.race-rank-1 img { border-color: #ffd700; box-shadow: 0 0 6px #ffd700; }
+
+.status-row { display: flex; justify-content: space-between; align-items: center; margin-top: 4px; }
+#status-text { font-size: 11px; color: #cbb8dc; }
+.bonus-badge {
+  background: rgba(255,255,255,0.12); padding: 3px 10px; border-radius: 20px;
+  font-size: 11px; font-weight: 700;
+}
+
+.ticker {
+  margin-top: 6px; font-size: 11px; line-height: 1.5; min-height: 18px;
+  max-height: 92px; overflow: hidden;
+}
+.ticker-item {
+  color: #ffe08a; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.ticker-item:first-child { color: #fff; font-weight: 700; }
+
+.flag-grid {
+  display: grid;
+  grid-template-columns: repeat(10, 1fr);
+  gap: 2px;
+  padding: 4px;
+}
+.flag-card {
+  background: #401a55;
+  border-radius: 4px;
+  text-align: center;
+  padding: 3px 1px 4px;
+  position: relative;
+  min-width: 0;
+}
+.flag-card img {
+  width: 100%; height: 22px; object-fit: cover; border-radius: 2px; display: block;
+}
+.flag-card .points {
+  font-size: 10px; font-weight: 800; margin-top: 2px;
+}
+.flag-card .country-name {
+  font-size: 6px; font-weight: 600; color: #d8c8e6;
+  margin-top: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.flag-card .rank {
+  position: absolute; top: 2px; left: 2px;
+  font-size: 9px; font-weight: 800; padding: 1px 4px; border-radius: 3px;
+  background: rgba(0,0,0,0.5);
+}
+.flag-card.rank-1 .rank { background: #ffd700; color: #402800; }
+.flag-card.rank-2 .rank { background: #d9d9d9; color: #2a2a2a; }
+.flag-card.rank-3 .rank { background: #cd7f32; color: #2a1200; }
+.flag-card.bump { animation: bump 0.6s ease; }
+@keyframes bump { 0%{transform:scale(1)} 40%{transform:scale(1.15)} 100%{transform:scale(1)} }
+
+.point-popup {
+  position: absolute;
+  left: 50%; top: 0;
+  transform: translate(-50%, 0);
+  font-weight: 800; font-size: 13px;
+  color: #ffe08a;
+  text-shadow: 0 1px 3px rgba(0,0,0,0.8);
+  pointer-events: none;
+  animation: float-up-fade 1.3s ease forwards;
+  z-index: 3;
+  white-space: nowrap;
+}
+.point-popup.subscribe { color: #ff5da2; font-size: 15px; }
+@keyframes float-up-fade {
+  0% { opacity: 0; transform: translate(-50%, 4px) scale(0.8); }
+  15% { opacity: 1; transform: translate(-50%, -6px) scale(1.1); }
+  100% { opacity: 0; transform: translate(-50%, -34px) scale(1); }
+}
+
+@media (min-width: 700px) {
+  .flag-card img { height: 32px; }
+  .flag-card .points { font-size: 12px; }
+  .flag-card .country-name { font-size: 8px; }
+}
