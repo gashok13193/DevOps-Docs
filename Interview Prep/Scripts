@@ -1,0 +1,130 @@
+	1. Self-Healing: Automated Disk Cleanup
+	
+	"Disk Full" alerts on Jenkins workers
+
+	#!/bin/bash
+	THRESHOLD=85
+	CURRENT_USAGE=$(df /var/log | grep / | awk '{ print $5 }' | sed 's/%//')
+	
+	if [ "$CURRENT_USAGE" -gt "$THRESHOLD" ]; then
+	    echo "Usage high: $CURRENT_USAGE%. Starting cleanup..."
+	    # 1. Clean logs older than 7 days
+	    find /var/log -type f -name "*.log" -mtime +7 -delete
+	    # 2. Clean Docker system prune
+	    docker system prune -af --volumes
+	    # 3. Alert Slack if still high
+	    NEW_USAGE=$(df /var/log | grep / | awk '{ print $5 }' | sed 's/%//')
+	    [[ "$NEW_USAGE" -gt "$THRESHOLD" ]] && curl -X POST -d '{"text":"Manual intervention needed"}' $SLACK_WEBHOOK
+	 fi
+	=====================================
+2. Huge monthly AWS costs from Dev/QA environments running during weekends
+
+
+	import boto3
+	
+	ec2 = boto3.resource('ec2', region_name='ap-south-1')
+	
+	def stop_dev_instances():
+	    # Only stop instances with Tag 'Env=Dev' and status 'running'
+	    filters = [{'Name': 'tag:Env', 'Values': ['Dev']},
+	               {'Name': 'instance-state-name', 'Values': ['running']}]
+	    
+	    instances = ec2.instances.filter(Filters=filters)
+	    ids = [i.id for i in instances]
+	    
+	    if ids:
+	        ec2.instances.filter(InstanceIds=ids).stop()
+	        print(f"Stopped {len(ids)} instances to save costs.")
+	
+	stop_dev_instances()
+	================================
+
+3. Zero-Trust Secrets Rotation (Vault)
+
+	Static database credentials stored in Kubernetes secrets are a major security risk.
+
+
+	import hvac # HashiCorp Vault client
+	
+	client = hvac.Client(url='https://vault.internal:8200', token='s.XXXX')
+	
+	def rotate_db_credentials(role_name):
+	    # Generate dynamic creds from Vault DB engine
+	    new_creds = client.secrets.database.generate_credentials(name=role_name)
+	    username = new_creds['data']['username']
+	    password = new_creds['data']['password']
+	    
+	    # Logic to update K8s Secret via kubernetes-python-client
+	    print(f"Rotated: {username} updated in K8s namespace.")
+	
+	rotate_db_credentials('readonly-app-role')
+
+=====================================
+
+4. DR environments often die. You need to ensure the secondary region is reachable and active.
+
+
+	import requests
+	
+	REGIONS = {"Primary": "https://api.primary.com", "DR": "https://api.dr.com"}
+	
+	def check_health():
+	    for name, url in REGIONS.items():
+	        try:
+	            resp = requests.get(f"{url}/health", timeout=5)
+	            status = "UP" if resp.status_code == 200 else "DOWN"
+	            print(f"{name} Region Health: {status}")
+	        except Exception:
+	            print(f"ALERT: {name} Region is UNREACHABLE!")
+	
+	check_health()
+
+==============================================
+	
+ 5. SLO Calculator to know the "Availability %" rather than just a list of alerts
+
+
+	import requests
+	import time
+	
+	PROMETHEUS_URL = "http://prometheus:9090/api/v1/query"
+	
+	def calculate_availability():
+	    # Query: Total success requests / Total requests over last 30 days
+	    query = 'sum(rate(http_requests_total{status="200"}[30d])) / sum(rate(http_requests_total[30d])) * 100'
+	    response = requests.get(PROMETHEUS_URL, params={'query': query})
+	    availability = response.json()['data']['result'][0]['value'][1]
+	    
+	    print(f"30-Day Availability Score: {float(availability):.2f}%")
+	
+	calculate_availability()
+
+===================================
+
+6. Kafka Rack Awareness Auditor
+
+
+	import subprocess
+	import json
+	
+	def check_rack_awareness(cluster_id):
+	    # Fetching topic metadata via kafka-topics.sh
+	    cmd = f"kafka-topics.sh --bootstrap-server {cluster_id}:9092 --describe"
+	    output = subprocess.check_output(cmd, shell=True).decode()
+	    
+	    issues = []
+	    for line in output.split('\n'):
+	        if "Topic:" in line and "Partition:" in line:
+	            # Logic to parse Replicas and match with Broker Rack ID
+	            # Simplified: checking if all replicas are on the same rack
+	            replicas = line.split("Replicas:")[1].split()[0]
+	            if len(set(get_rack_for_broker(r) for r in replicas.split(','))) == 1:
+	                issues.append(line)
+	    return issues
+	
+===============================================
+Automations:
+
+1. Automating the cleanup of orphaned resources (Unused PVCs, evicted pods, or old ConfigMaps) to keep the cluster lean.
+2. A script that identifies unattached EBS volumes, idle ELBs, and outdated RDS snapshots (FinOPS)
+3 . Scripts that verify SSL expiration across internal load balancers and trigger renewals or alerts before the expiry 
