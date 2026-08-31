@@ -96,3 +96,8 @@ const YouTube = (() => {
 
   return { init, stop, extractVideoId, getVideoInfo, pollChat, pollLikes };
 })();
+
+// Also usable from Node (server.js) via require('./js/youtube.js'); no-op in the browser.
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = YouTube;
+}

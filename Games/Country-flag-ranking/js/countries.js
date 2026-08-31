@@ -239,3 +239,8 @@ function findCountryInText(text) {
   }
   return null;
 }
+
+// Also usable from Node (server.js) via require('./js/countries.js'); no-op in the browser.
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = { COUNTRIES, findCountryInText };
+}

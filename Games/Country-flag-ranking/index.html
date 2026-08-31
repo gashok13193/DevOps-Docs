@@ -15,11 +15,11 @@
       <p class="hint">Connect this to your YouTube live stream. Comments with a country name score +1, a subscribe keyword scores +100, and rising video likes add a global bonus.</p>
 
       <label>YouTube API Key
-        <input id="input-api-key" type="text" placeholder="AIza..." autocomplete="off" />
+        <input id="input-api-key" type="text" placeholder="AIza..." autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" />
       </label>
 
       <label>Live Video URL or ID
-        <input id="input-video-id" type="text" placeholder="https://youtube.com/watch?v=... or video ID" autocomplete="off" />
+        <input id="input-video-id" type="text" placeholder="https://youtube.com/watch?v=... or video ID" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" />
       </label>
 
       <label>Subscribe keyword(s) <span class="hint-small">(comma separated, case-insensitive)</span>
@@ -70,9 +70,6 @@
     <main id="flag-grid" class="flag-grid"></main>
   </section>
 
-  <script src="js/countries.js"></script>
-  <script src="js/scoring.js"></script>
-  <script src="js/youtube.js"></script>
   <script src="js/app.js"></script>
 </body>
 </html>

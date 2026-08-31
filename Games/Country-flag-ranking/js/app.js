@@ -1,4 +1,5 @@
-// Ties together settings UI, YouTube polling, scoring, and rendering.
+// Thin client: all YouTube polling + scoring now happens on the local server (server.js),
+// so every device that opens this page sees the same shared board without re-entering the API key.
 (() => {
   const el = id => document.getElementById(id);
   const setupScreen = el('setup-screen');
@@ -12,11 +13,10 @@
   const leaderBanner = el('leader-banner');
   const subBanner = el('sub-banner');
 
-  const SETTINGS_KEY = 'flagRanking_settings';
-  let subKeywords = [];
-  let demoTimer = null;
   let bannerTimer = null;
+  let pollTimer = null;
   let targetScore = 3700;
+  let lastSeenEventTs = 0;
 
   const BANNER_MESSAGES = [
     '💬 Comment Your Country = +1',
@@ -25,7 +25,7 @@
   ];
 
   function startBannerRotation() {
-    if (bannerTimer) clearInterval(bannerTimer);
+    stopBannerRotation();
     let lastIndex = -1;
     bannerTimer = setInterval(() => {
       let next = Math.floor(Math.random() * BANNER_MESSAGES.length);
@@ -35,27 +35,14 @@
     }, 4000);
   }
 
-  function loadSavedSettings() {
-    try {
-      const raw = localStorage.getItem(SETTINGS_KEY);
-      if (!raw) return;
-      const s = JSON.parse(raw);
-      if (s.apiKey) el('input-api-key').value = s.apiKey;
-      if (s.videoId) el('input-video-id').value = s.videoId;
-      if (s.subKeywords) el('input-sub-keywords').value = s.subKeywords;
-      if (s.startPoints != null) el('input-start-points').value = s.startPoints;
-      if (s.targetScore != null) el('input-target-score').value = s.targetScore;
-    } catch (e) { /* ignore corrupt settings */ }
-  }
-
-  function saveSettings(s) {
-    localStorage.setItem(SETTINGS_KEY, JSON.stringify(s));
+  function stopBannerRotation() {
+    if (bannerTimer) clearInterval(bannerTimer);
+    bannerTimer = null;
   }
 
   function showSetup(errorMsg) {
-    if (demoTimer) { clearInterval(demoTimer); demoTimer = null; }
-    if (bannerTimer) { clearInterval(bannerTimer); bannerTimer = null; }
-    YouTube.stop();
+    stopPolling();
+    stopBannerRotation();
     setupScreen.classList.remove('hidden');
     boardScreen.classList.add('hidden');
     el('setup-error').textContent = errorMsg || '';
@@ -85,34 +72,6 @@
     raceTrack.innerHTML = '<div class="race-finish"></div>' + markers;
   }
 
-  function render() {
-    const sorted = Scoring.getSortedCountries();
-    grid.innerHTML = sorted.map((c, i) => {
-      const rankClass = i === 0 ? 'rank-1' : i === 1 ? 'rank-2' : i === 2 ? 'rank-3' : '';
-      return `
-        <div class="flag-card ${rankClass}" data-code="${c.code}">
-          ${i < 3 ? `<span class="rank">#${i + 1}</span>` : ''}
-          <img src="${flagUrl(c.code)}" alt="${c.name}" loading="lazy" />
-          <div class="country-name">${c.name}</div>
-          <div class="points">${c.points}</div>
-        </div>`;
-    }).join('');
-    bonusBadge.textContent = `❤️ Bonus: ${Scoring.getBonusPoints()}`;
-    const events = Scoring.getRecentEvents();
-    ticker.innerHTML = events.length
-      ? events.slice(0, 5).map(e => `<div class="ticker-item">${e.label}</div>`).join('')
-      : '<div class="ticker-item">Waiting for chat activity…</div>';
-    renderRaceTrack(sorted);
-
-    const leader = sorted[0];
-    if (leader) {
-      const remaining = Math.max(0, targetScore - leader.points);
-      leaderBanner.textContent = remaining === 0
-        ? `🏆 ${leader.name} wins! Reached the target of ${targetScore}!`
-        : `🏆 ${leader.name} is leading with ${leader.points} pts — ${remaining} to go!`;
-    }
-  }
-
   function bumpCard(code) {
     const card = grid.querySelector(`.flag-card[data-code="${code}"]`);
     if (card) {
@@ -135,146 +94,143 @@
     setTimeout(() => popup.remove(), 1500);
   }
 
-  function parseKeywords(raw) {
-    return raw.split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
-  }
+  function render(data) {
+    const sorted = data.sorted || [];
+    grid.innerHTML = sorted.map((c, i) => {
+      const rankClass = i === 0 ? 'rank-1' : i === 1 ? 'rank-2' : i === 2 ? 'rank-3' : '';
+      return `
+        <div class="flag-card ${rankClass}" data-code="${c.code}">
+          ${i < 3 ? `<span class="rank">#${i + 1}</span>` : ''}
+          <img src="${flagUrl(c.code)}" alt="${c.name}" loading="lazy" />
+          <div class="country-name">${c.name}</div>
+          <div class="points">${c.points}</div>
+        </div>`;
+    }).join('');
+    bonusBadge.textContent = `❤️ Bonus: ${data.bonusPoints || 0}`;
+    statusText.textContent = data.statusText || '';
 
-  function handleChatMessage(item) {
-    const id = item.id;
-    if (Scoring.hasProcessedMessage(id)) return;
-    Scoring.markMessageProcessed(id);
+    const events = data.recentEvents || [];
+    ticker.innerHTML = events.length
+      ? events.slice(0, 5).map(e => `<div class="ticker-item">${e.label}</div>`).join('')
+      : '<div class="ticker-item">Waiting for chat activity…</div>';
+    renderRaceTrack(sorted);
 
-    const text = item.snippet?.displayMessage || '';
-    const authorId = item.authorDetails?.channelId || null;
-    const authorName = item.authorDetails?.displayName || 'Someone';
-
-    const countryCode = findCountryInText(text);
-    let subscribeCode = null;
-
-    if (countryCode) {
-      Scoring.addCommentPoint(countryCode, authorId, authorName);
+    const leader = sorted[0];
+    if (leader) {
+      const remaining = Math.max(0, targetScore - leader.points);
+      leaderBanner.textContent = remaining === 0
+        ? `🏆 ${leader.name} wins! Reached the target of ${targetScore}!`
+        : `🏆 ${leader.name} is leading with ${leader.points} pts — ${remaining} to go!`;
     }
 
-    const lowerText = text.toLowerCase();
-    const isSubscribeMsg = subKeywords.some(k => k && lowerText.includes(k));
-    if (isSubscribeMsg) {
-      const targetCode = countryCode || Scoring.getLastCountryForAuthor(authorId);
-      if (targetCode) {
-        Scoring.addSubscribeBonus(targetCode, authorName, authorId);
-        subscribeCode = targetCode;
-      }
-    }
-
-    // Render first (rebuilds the flag grid), then attach popups/animations to the fresh DOM nodes.
-    render();
-    if (countryCode) {
-      bumpCard(countryCode);
-      showPointPopup(countryCode, '+1', false, authorName);
-    }
-    if (subscribeCode) {
-      bumpCard(subscribeCode);
-      showPointPopup(subscribeCode, '+100 🎉', true, authorName);
-    }
-  }
-
-  function startLive(apiKey, videoIdOrUrl, startPoints) {
-    const videoId = YouTube.extractVideoId(videoIdOrUrl);
-    if (!videoId) {
-      showSetup('Could not read a video ID from that URL. Paste the full live stream URL or the 11-character video ID.');
-      return;
-    }
-
-    Scoring.load(videoId, startPoints);
-    targetValueEl.textContent = targetScore;
-    YouTube.init(apiKey);
-    showBoard();
-    startBannerRotation();
-    statusText.textContent = 'Connecting to live chat…';
-    render();
-
-    YouTube.getVideoInfo(videoId).then(info => {
-      if (info.likeCount != null) Scoring.setLastKnownLikeCount(info.likeCount);
-
-      if (!info.liveChatId) {
-        statusText.textContent = 'No active live chat found for this video. Is it live right now?';
-        return;
-      }
-      statusText.textContent = '🟢 Connected — comment your country in chat!';
-
-      YouTube.pollChat(info.liveChatId, messages => {
-        messages.forEach(handleChatMessage);
-      }, err => {
-        statusText.textContent = `⚠️ Chat error: ${err.message}`;
-      });
-
-      YouTube.pollLikes(videoId, likeCount => {
-        const last = Scoring.getLastKnownLikeCount();
-        if (last != null && likeCount > last) {
-          Scoring.addLikeBonus(likeCount - last);
-          render();
-        }
-        Scoring.setLastKnownLikeCount(likeCount);
-      }, err => {
-        console.warn('Like poll error', err);
-      }, 15000);
-    }).catch(err => {
-      showSetup(err.message);
+    // Only pop/bump for events that are new since the last poll (avoids replaying old ones).
+    const newEvents = events.filter(e => e.ts > lastSeenEventTs);
+    newEvents.slice().reverse().forEach(e => {
+      if (!e.code) return; // e.g. like-bonus events aren't tied to a country
+      bumpCard(e.code);
+      showPointPopup(e.code, e.type === 'subscribe' ? '+100 🎉' : '+1', e.type === 'subscribe', e.authorName);
     });
+    if (events.length) lastSeenEventTs = Math.max(lastSeenEventTs, events[0].ts);
   }
 
-  function startDemo(startPoints) {
-    Scoring.load('demo', startPoints);
-    showBoard();
-    startBannerRotation();
-    statusText.textContent = '🧪 Demo mode — simulating chat activity (no real YouTube data).';
-    render();
-
-    const sampleNames = ['Aria', 'Leo', 'Maya', 'Noah', 'Zoe', 'Kai', 'Ivy', 'Omar'];
-    demoTimer = setInterval(() => {
-      const country = COUNTRIES[Math.floor(Math.random() * COUNTRIES.length)];
-      const name = sampleNames[Math.floor(Math.random() * sampleNames.length)];
-      const roll = Math.random();
-      if (roll < 0.08) {
-        Scoring.addSubscribeBonus(country.code, name, `demo-${name}`);
-        showPointPopup(country.code, '+100 🎉', true, name);
-      } else if (roll < 0.15) {
-        Scoring.addLikeBonus(1);
-      } else {
-        Scoring.addCommentPoint(country.code, `demo-${name}`, name);
-        showPointPopup(country.code, '+1', false, name);
-      }
-      bumpCard(country.code);
-      render();
-    }, 900);
+  async function pollState() {
+    try {
+      const res = await fetch('/api/state');
+      const data = await res.json();
+      if (data.targetScore) targetScore = data.targetScore;
+      render(data);
+    } catch (err) {
+      statusText.textContent = '⚠️ Lost connection to the local server.';
+    }
   }
 
-  el('btn-start').addEventListener('click', () => {
+  function startPolling() {
+    stopPolling();
+    pollState();
+    pollTimer = setInterval(pollState, 1500);
+  }
+
+  function stopPolling() {
+    if (pollTimer) clearInterval(pollTimer);
+    pollTimer = null;
+  }
+
+  el('btn-start').addEventListener('click', async () => {
     const apiKey = el('input-api-key').value.trim();
     const videoId = el('input-video-id').value.trim();
     const startPoints = parseInt(el('input-start-points').value, 10) || 0;
     targetScore = parseInt(el('input-target-score').value, 10) || 3700;
-    subKeywords = parseKeywords(el('input-sub-keywords').value);
+    const subKeywords = el('input-sub-keywords').value;
 
     if (!apiKey || !videoId) {
       showSetup('Please enter both an API key and a video URL/ID.');
       return;
     }
-    saveSettings({ apiKey, videoId, subKeywords: el('input-sub-keywords').value, startPoints, targetScore });
-    startLive(apiKey, videoId, startPoints);
+    try {
+      const res = await fetch('/api/config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ apiKey, videoId, subKeywords, startPoints, targetScore }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.ok) {
+        showSetup(data.error || 'Could not start the live board.');
+        return;
+      }
+      lastSeenEventTs = 0;
+      showBoard();
+      startBannerRotation();
+      startPolling();
+    } catch (err) {
+      showSetup('Could not reach the local server. Is "node server.js" running?');
+    }
   });
 
-  el('btn-demo').addEventListener('click', () => {
+  el('btn-demo').addEventListener('click', async () => {
     const startPoints = parseInt(el('input-start-points').value, 10) || 0;
     targetScore = parseInt(el('input-target-score').value, 10) || 3700;
-    subKeywords = parseKeywords(el('input-sub-keywords').value || 'subscribed, sub');
-    startDemo(startPoints);
+    const subKeywords = el('input-sub-keywords').value || 'subscribed, sub';
+    try {
+      await fetch('/api/demo', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ subKeywords, startPoints, targetScore }),
+      });
+      lastSeenEventTs = 0;
+      showBoard();
+      startBannerRotation();
+      startPolling();
+    } catch (err) {
+      showSetup('Could not reach the local server. Is "node server.js" running?');
+    }
   });
 
-  el('btn-settings').addEventListener('click', () => {
-    if (confirm('Return to settings? The live connection will stop (scores are saved).')) {
+  el('btn-settings').addEventListener('click', async () => {
+    if (confirm('Return to settings? The live connection will stop for everyone (scores are saved).')) {
+      try { await fetch('/api/reset', { method: 'POST' }); } catch (e) { /* server may be unreachable */ }
       showSetup();
     }
   });
 
-  loadSavedSettings();
+  // On load, check whether another device already started a live/demo session on the server
+  // and jump straight to the board if so — this is what lets a phone join without any setup.
+  (async function init() {
+    try {
+      const res = await fetch('/api/status');
+      const status = await res.json();
+      if (status.targetScore) el('input-target-score').value = status.targetScore;
+      if (status.subKeywords && status.subKeywords.length) el('input-sub-keywords').value = status.subKeywords.join(', ');
+      if (status.startPoints != null) el('input-start-points').value = status.startPoints;
+      if (status.videoId) el('input-video-id').value = status.videoId;
+
+      if (status.mode === 'live' || status.mode === 'demo') {
+        targetScore = status.targetScore || 3700;
+        showBoard();
+        startBannerRotation();
+        startPolling();
+      }
+    } catch (err) {
+      // Local server not reachable (e.g. opened via file://) — stay on the setup screen.
+    }
+  })();
 })();
