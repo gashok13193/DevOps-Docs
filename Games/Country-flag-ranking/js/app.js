@@ -388,8 +388,9 @@
     }
   });
 
-  // On load, check whether another device already started a live/demo session on the server
+  // On load, check whether another device already started a REAL live session on the server
   // and jump straight to the board if so — this is what lets a phone join without any setup.
+  // (Demo Mode intentionally does NOT auto-join other devices — it's a local, one-off preview.)
   (async function init() {
     try {
       const res = await fetch('/api/status');
@@ -399,14 +400,23 @@
       if (status.startPoints != null) el('input-start-points').value = status.startPoints;
       if (status.videoId) el('input-video-id').value = status.videoId;
 
-      if (status.mode === 'live' || status.mode === 'demo') {
+      if (status.mode === 'live') {
         targetScore = status.targetScore || 3700;
         showBoard();
         startBannerRotation();
         startPolling();
+        // No button click happened on this device, so autoplay policies block audio until
+        // the visitor taps something — show a one-time prompt to unlock sound/melody.
+        el('btn-enable-sound').classList.remove('hidden');
       }
     } catch (err) {
       // Local server not reachable (e.g. opened via file://) — stay on the setup screen.
     }
   })();
+
+  el('btn-enable-sound').addEventListener('click', () => {
+    ensureAudio();
+    startMelody();
+    el('btn-enable-sound').classList.add('hidden');
+  });
 })();

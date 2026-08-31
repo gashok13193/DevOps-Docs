@@ -59,6 +59,13 @@ html, body {
 @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
 .icon-btn { background: none; border: none; font-size: 18px; cursor: pointer; color: #fff; }
 
+.enable-sound-btn {
+  display: block; width: 100%; margin-top: 6px;
+  background: linear-gradient(135deg, #ff5da2, #ff8a00); color: #1a0526;
+  border: none; border-radius: 8px; padding: 8px; font-size: 13px; font-weight: 800; cursor: pointer;
+}
+.enable-sound-btn.hidden { display: none; }
+
 .banner-row {
   display: flex; align-items: center; gap: 8px; margin-top: 6px;
 }
