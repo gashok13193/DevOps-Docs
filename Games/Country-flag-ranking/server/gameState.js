@@ -78,33 +78,51 @@ function levelForComments(comments) {
   return Math.min(10, Math.floor((comments || 0) / 100) + 1);
 }
 
+const LEVEL_TITLES = {
+  1: 'Newcomer', 2: 'Rising Star', 3: 'Chat Enthusiast', 4: 'Community Voice',
+  5: 'Local Legend', 6: 'Fan Favorite', 7: 'Global Icon', 8: 'Superstar',
+  9: 'Hall of Famer', 10: 'Legendary Champion',
+};
+const MILESTONE_STEP = 10;
+
+function titleForLevel(level) {
+  return LEVEL_TITLES[level] || LEVEL_TITLES[1];
+}
+
+function starsForLevel(level) {
+  return Math.min(5, Math.ceil(level / 2));
+}
+
 function countryName(code) {
   return COUNTRIES.find(c => c.code === code)?.name || code.toUpperCase();
 }
 
-function bumpUserComment(authorId, authorName) {
-  if (!authorId) return { comments: 0, level: 1 };
-  if (!state.userStats[authorId]) state.userStats[authorId] = { name: authorName, comments: 0 };
+function bumpUserStats(authorId, authorName, commentDelta, pointsDelta) {
+  if (!authorId) return { comments: 0, level: 1, points: 0 };
+  if (!state.userStats[authorId]) state.userStats[authorId] = { name: authorName, comments: 0, points: 0 };
   const entry = state.userStats[authorId];
   entry.name = authorName || entry.name;
-  entry.comments += 1;
-  return { comments: entry.comments, level: levelForComments(entry.comments) };
+  entry.comments += commentDelta;
+  entry.points = (entry.points || 0) + pointsDelta;
+  return { comments: entry.comments, level: levelForComments(entry.comments), points: entry.points };
 }
 
 function getUserStats(authorId) {
   const entry = state.userStats[authorId];
-  if (!entry) return { comments: 0, level: 1 };
-  return { comments: entry.comments, level: levelForComments(entry.comments) };
+  if (!entry) return { comments: 0, level: 1, points: 0 };
+  return { comments: entry.comments, level: levelForComments(entry.comments), points: entry.points || 0 };
 }
 
 function addCommentPoint(code, authorId, authorName) {
   if (!(code in state.countries)) return;
   state.countries[code] += 1;
   if (authorId) state.lastCountryByAuthor[authorId] = code;
-  const { comments, level } = bumpUserComment(authorId, authorName);
+  const { comments, level, points } = bumpUserStats(authorId, authorName, 1, 1);
+  const milestone = comments > 0 && comments % MILESTONE_STEP === 0;
   pushEvent({
     type: 'comment', code, delta: 1, authorId, authorName, comments, level,
     label: `[Lvl ${level}] ${authorName || 'Someone'} (${comments} comments) → ${countryName(code)} +1`,
+    ...(milestone ? { milestone: true, title: titleForLevel(level), stars: starsForLevel(level), totalPoints: points } : {}),
   });
   save();
   return { comments, level };
@@ -113,7 +131,7 @@ function addCommentPoint(code, authorId, authorName) {
 function addSubscribeBonus(code, authorName, authorId) {
   if (!code || !(code in state.countries)) return false;
   state.countries[code] += 100;
-  const { comments, level } = getUserStats(authorId);
+  const { comments, level } = bumpUserStats(authorId, authorName, 0, 100);
   pushEvent({
     type: 'subscribe', code, delta: 100, authorId, authorName, comments, level,
     label: `[Lvl ${level}] ${authorName || 'Someone'} subscribed! → ${countryName(code)} +100`,

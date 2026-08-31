@@ -50,6 +50,7 @@
       <div class="title-row">
         <span class="live-dot"></span>
         <h1>Comment Your Country!</h1>
+        <button id="btn-mute" class="icon-btn" title="Mute sounds">🔊</button>
         <button id="btn-settings" class="icon-btn" title="Settings">⚙️</button>
       </div>
       <div class="banner-row">
@@ -60,12 +61,36 @@
       <div id="race-track" class="race-track">
         <div class="race-finish"></div>
       </div>
+      <div id="commentary" class="commentary"></div>
       <div class="status-row">
         <span id="status-text">Connecting…</span>
         <span id="bonus-badge" class="bonus-badge">❤️ Bonus: 0</span>
       </div>
       <div id="ticker" class="ticker"></div>
     </header>
+
+    <!-- Milestone celebration card: shown briefly when a commenter hits a comment milestone -->
+    <div id="milestone-card" class="milestone-card hidden">
+      <span class="milestone-badge">🌟 <span id="milestone-title">Rising Star</span></span>
+      <div class="milestone-body">
+        <div id="milestone-stars" class="milestone-stars">★★☆☆☆</div>
+        <div class="milestone-level">Level <span id="milestone-level">1</span></div>
+        <div id="milestone-name" class="milestone-name">@user</div>
+        <div id="milestone-message" class="milestone-message">10 Comment Milestone!</div>
+        <div class="milestone-points">🪙 <span id="milestone-points">0</span> Total Points</div>
+      </div>
+    </div>
+
+    <!-- Subscribe celebration card: shown briefly whenever someone subscribes for +100 points -->
+    <div id="subscribe-card" class="subscribe-card hidden">
+      <span class="subscribe-badge">🔔 New Subscriber!</span>
+      <div class="subscribe-body">
+        <img id="subscribe-flag" class="subscribe-flag" src="" alt="" />
+        <div id="subscribe-name" class="subscribe-name">@user</div>
+        <div id="subscribe-country" class="subscribe-country">Country</div>
+        <div class="subscribe-points">+100 Points! 🎉</div>
+      </div>
+    </div>
 
     <main id="flag-grid" class="flag-grid"></main>
   </section>

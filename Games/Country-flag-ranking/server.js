@@ -21,6 +21,12 @@ let session = {
   statusText: 'Not started yet.',
 };
 let demoTimerHandle = null;
+let idleFillerTimer = null;
+let lastChatActivity = Date.now();
+let lastFillerSubscribeTime = 0;
+const IDLE_THRESHOLD_MS = 30000;
+const FILLER_SUBSCRIBE_COOLDOWN_MS = 3 * 60 * 1000;
+const FILLER_NAMES = ['Fan92', 'ViewerX', 'StreamBuddy', 'NightOwl', 'ChatRider', 'PixelFan', 'QuickClap', 'GameLover'];
 
 function parseKeywords(raw) {
   if (Array.isArray(raw)) return raw.map(s => String(s).trim().toLowerCase()).filter(Boolean);
@@ -28,6 +34,7 @@ function parseKeywords(raw) {
 }
 
 function handleChatMessage(item) {
+  lastChatActivity = Date.now();
   const id = item.id;
   if (GameState.hasProcessedMessage(id)) return;
   GameState.markMessageProcessed(id);
@@ -49,20 +56,51 @@ function handleChatMessage(item) {
 
 function stopAll(nextStatusText) {
   if (demoTimerHandle) { clearInterval(demoTimerHandle); demoTimerHandle = null; }
+  stopIdleFiller();
   YouTube.stop();
   session.mode = 'idle';
   session.statusText = nextStatusText || 'Stopped.';
+}
+
+// While connected to a real live stream, if no real chat message has arrived for
+// IDLE_THRESHOLD_MS, inject occasional demo-like comment/subscribe/like events so the
+// board keeps showing activity instead of looking dead during quiet stretches.
+function startIdleFiller() {
+  stopIdleFiller();
+  idleFillerTimer = setInterval(() => {
+    if (session.mode !== 'live') return;
+    if (Date.now() - lastChatActivity < IDLE_THRESHOLD_MS) return;
+    const country = COUNTRIES[Math.floor(Math.random() * COUNTRIES.length)];
+    const name = FILLER_NAMES[Math.floor(Math.random() * FILLER_NAMES.length)];
+    const roll = Math.random();
+    const canSubscribe = Date.now() - lastFillerSubscribeTime >= FILLER_SUBSCRIBE_COOLDOWN_MS;
+    if (roll < 0.1 && canSubscribe) {
+      GameState.addSubscribeBonus(country.code, name, `filler-${name}`);
+      lastFillerSubscribeTime = Date.now();
+    } else if (roll < 0.3) {
+      GameState.addLikeBonus(1);
+    } else {
+      GameState.addCommentPoint(country.code, `filler-${name}`, name);
+    }
+  }, 4000);
+}
+
+function stopIdleFiller() {
+  if (idleFillerTimer) clearInterval(idleFillerTimer);
+  idleFillerTimer = null;
 }
 
 function startLiveInternal(cfg) {
   stopAll();
   GameState.load(cfg.videoId, cfg.startPoints);
   YouTube.init(cfg.apiKey);
+  lastChatActivity = Date.now();
   session = {
     mode: 'live', videoId: cfg.videoId, targetScore: cfg.targetScore,
     subKeywords: parseKeywords(cfg.subKeywords), startPoints: cfg.startPoints,
     statusText: 'Connecting to live chat…',
   };
+  startIdleFiller();
 
   YouTube.getVideoInfo(cfg.videoId).then(info => {
     if (info.likeCount != null) GameState.setLastKnownLikeCount(info.likeCount);

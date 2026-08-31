@@ -88,6 +88,63 @@ html, body {
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 
+.commentary {
+  margin-top: 6px; min-height: 16px; max-height: 48px; overflow: hidden;
+  font-size: 12px; font-weight: 700; line-height: 1.4;
+}
+.commentary-item {
+  color: #ff8a3d; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  animation: commentary-pop 0.4s ease;
+}
+@keyframes commentary-pop {
+  0% { opacity: 0; transform: translateY(-4px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+
+.milestone-card {
+  position: fixed; top: 70px; left: 50%; transform: translateX(-50%);
+  z-index: 20; width: min(320px, 90vw);
+  background: linear-gradient(160deg, #3a1250, #1a0526);
+  border: 2px solid #ffcf33; border-radius: 14px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.5), 0 0 20px rgba(255,207,51,0.4);
+  padding: 12px 14px;
+  animation: milestone-in 0.4s ease;
+}
+.milestone-card.hidden { display: none; }
+@keyframes milestone-in {
+  0% { opacity: 0; transform: translateX(-50%) translateY(-16px) scale(0.9); }
+  100% { opacity: 1; transform: translateX(-50%) translateY(0) scale(1); }
+}
+.milestone-badge {
+  display: inline-block; background: #ffcf33; color: #402800;
+  font-size: 11px; font-weight: 800; padding: 3px 10px; border-radius: 20px; margin-bottom: 6px;
+}
+.milestone-stars { font-size: 16px; color: #ffcf33; letter-spacing: 2px; }
+.milestone-level { font-size: 12px; color: #d8c8e6; font-weight: 700; margin-top: 2px; }
+.milestone-name { font-size: 15px; font-weight: 800; color: #fff; margin-top: 4px; }
+.milestone-message { font-size: 13px; color: #ff8a3d; font-weight: 700; margin-top: 2px; }
+.milestone-points { font-size: 13px; color: #ffcf33; font-weight: 800; margin-top: 6px; }
+
+.subscribe-card {
+  position: fixed; top: 140px; left: 50%; transform: translateX(-50%);
+  z-index: 20; width: min(300px, 88vw);
+  text-align: center;
+  background: linear-gradient(160deg, #7a2cff, #ff2fb0);
+  border: 2px solid #fff; border-radius: 14px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.5), 0 0 20px rgba(255,47,176,0.5);
+  padding: 12px 14px;
+  animation: milestone-in 0.4s ease;
+}
+.subscribe-card.hidden { display: none; }
+.subscribe-badge {
+  display: inline-block; background: #fff; color: #7a2cff;
+  font-size: 11px; font-weight: 800; padding: 3px 10px; border-radius: 20px; margin-bottom: 8px;
+}
+.subscribe-flag { width: 56px; height: 38px; object-fit: cover; border-radius: 4px; border: 2px solid #fff; }
+.subscribe-name { font-size: 15px; font-weight: 800; color: #fff; margin-top: 6px; }
+.subscribe-country { font-size: 12px; color: #ffe5f5; font-weight: 700; }
+.subscribe-points { font-size: 15px; color: #ffe08a; font-weight: 800; margin-top: 6px; }
+
 .race-track {
   position: relative;
   height: 62px;
