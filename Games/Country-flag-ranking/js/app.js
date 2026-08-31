@@ -11,15 +11,17 @@
   const raceTrack = el('race-track');
   const targetValueEl = el('target-value');
   const leaderBanner = el('leader-banner');
-  const subBanner = el('sub-banner');
+  const neonTitle = el('neon-title');
+  const titleEmojiLeft = el('title-emoji-left');
+  const titleEmojiRight = el('title-emoji-right');
   const muteBtn = el('btn-mute');
-  const commentaryEl = el('commentary');
   const milestoneCard = el('milestone-card');
   const subscribeCard = el('subscribe-card');
+  const winnerCard = el('winner-card');
 
   let bannerTimer = null;
   let pollTimer = null;
-  let targetScore = 3700;
+  let targetScore = 5000;
   let lastSeenEventTs = 0;
   let soundEnabled = true;
   let audioCtx = null;
@@ -57,9 +59,11 @@
     beep(1320, 0.14, 0.18);
   }
 
-  function playOvertakeSound() {
-    beep(300, 0.05, 0);
-    beep(500, 0.07, 0.05);
+  function playWinnerSound() {
+    beep(523.25, 0.15, 0);
+    beep(659.25, 0.15, 0.15);
+    beep(783.99, 0.15, 0.3);
+    beep(1046.5, 0.35, 0.45);
   }
 
   // Soft ambient background melody: a gentle looping arpeggio, quiet enough to sit behind speech/SFX.
@@ -82,8 +86,34 @@
     musicTimer = null;
   }
 
-  // Voice narration removed per user request; kept as a no-op so existing call sites don't need changes.
-  function speak() {}
+  // Real spoken commentary via the browser's built-in text-to-speech (no API key/audio files needed).
+  const MALE_VOICE_HINTS = [
+    'male', 'david', 'guy', 'ryan', 'christopher', 'eric', 'daniel', 'mark', 'james',
+    'george', 'matthew', 'brian', 'alex', 'fred', 'tom', 'google uk english male',
+  ];
+  let speechVoice = null;
+  function loadSpeechVoice() {
+    if (!('speechSynthesis' in window) || speechVoice) return; // lock the first voice we find; never switch mid-session
+    const voices = window.speechSynthesis.getVoices();
+    const enVoices = voices.filter(v => v.lang && v.lang.startsWith('en'));
+    const pool = enVoices.length ? enVoices : voices;
+    speechVoice = pool.find(v => MALE_VOICE_HINTS.some(h => v.name.toLowerCase().includes(h))) || pool[0] || voices[0] || null;
+  }
+  if ('speechSynthesis' in window) {
+    loadSpeechVoice();
+    window.speechSynthesis.onvoiceschanged = loadSpeechVoice;
+  }
+
+  function speak(text) {
+    if (!soundEnabled || !('speechSynthesis' in window)) return;
+    if (!speechVoice) loadSpeechVoice(); // make sure the very first utterance also uses our chosen voice, not the browser default
+    const utter = new SpeechSynthesisUtterance(text.replace(/[\u{1F300}-\u{1FAFF}\u2600-\u27BF]/gu, ''));
+    if (speechVoice) utter.voice = speechVoice;
+    utter.rate = 0.92;
+    utter.pitch = 0.95;
+    utter.volume = 0.8;
+    window.speechSynthesis.speak(utter);
+  }
 
   muteBtn.addEventListener('click', () => {
     soundEnabled = !soundEnabled;
@@ -92,9 +122,10 @@
   });
 
   const BANNER_MESSAGES = [
-    '💬 Comment Your Country = +1',
-    '🔔 Subscribe = +100 Points',
-    '❤️ Like the Video = +10 Bonus',
+    { left: '🌍', title: 'WHERE ARE<br />YOU FROM?', right: '😎' },
+    { left: '🔔', title: 'SUBSCRIBE =<br />GET +100 POINTS', right: '🔔' },
+    { left: '💬', title: 'COMMENT YOUR<br />COUNTRY = +1', right: '💬' },
+    { left: '❤️', title: 'LIKE THE VIDEO<br />= +10 BONUS', right: '❤️' },
   ];
 
   function startBannerRotation() {
@@ -104,7 +135,10 @@
       let next = Math.floor(Math.random() * BANNER_MESSAGES.length);
       if (next === lastIndex) next = (next + 1) % BANNER_MESSAGES.length;
       lastIndex = next;
-      subBanner.textContent = BANNER_MESSAGES[next];
+      const msg = BANNER_MESSAGES[next];
+      neonTitle.innerHTML = msg.title;
+      titleEmojiLeft.textContent = msg.left;
+      titleEmojiRight.textContent = msg.right;
     }, 4000);
   }
 
@@ -164,40 +198,7 @@
     }
   }
 
-  const OVERTAKE_PHRASES = ['overtakes', 'blasts past', 'crushes', 'storms past', 'leaves behind', 'surges past'];
-  const OVERTAKE_EMOJI = ['🔥', '🚀', '💥', '⚡'];
-  let prevTopOrder = [];
   let prevLeaderCode = null;
-  let commentaryLog = []; // newest first, capped
-
-  // Compares this poll's top 10 order to the previous one and returns sportscaster-style
-  // lines for every pair whose relative order flipped (a genuine overtake), plus new entries.
-  function computeCommentary(sorted) {
-    const newTop = sorted.slice(0, 10).map(c => c.code);
-    const lines = [];
-    if (prevTopOrder.length) {
-      const prevRank = new Map(prevTopOrder.map((code, i) => [code, i]));
-      const nameOf = code => (sorted.find(c => c.code === code) || {}).name || code.toUpperCase();
-
-      for (let i = 0; i < newTop.length; i++) {
-        const mover = newTop[i];
-        if (!prevRank.has(mover)) {
-          lines.push(`🆕 ${nameOf(mover)} breaks into the Top 10 at #${i + 1}!`);
-          continue;
-        }
-        for (let j = i + 1; j < newTop.length; j++) {
-          const passed = newTop[j];
-          if (prevRank.has(passed) && prevRank.get(mover) > prevRank.get(passed)) {
-            const phrase = OVERTAKE_PHRASES[Math.floor(Math.random() * OVERTAKE_PHRASES.length)];
-            const emoji = OVERTAKE_EMOJI[Math.floor(Math.random() * OVERTAKE_EMOJI.length)];
-            lines.push(`${emoji} ${nameOf(mover)} ${phrase} ${nameOf(passed)} to grab #${i + 1}!`);
-          }
-        }
-      }
-    }
-    prevTopOrder = newTop;
-    return lines;
-  }
 
   // Shows a floating "name +points" label on top of the given flag card, then removes it.
   function showPointPopup(code, text, isSubscribe, authorName) {
@@ -241,6 +242,19 @@
     subscribeHideTimer = setTimeout(() => subscribeCard.classList.add('hidden'), 4000);
   }
 
+  let winnerHideTimer = null;
+
+  // Shows the big winner celebration card when a country reaches the target and the board resets.
+  function showWinnerCard(e) {
+    el('winner-name').textContent = e.winnerName || 'Someone';
+    el('winner-message').textContent = `Reached ${e.targetScore ?? targetScore} pts!`;
+    winnerCard.classList.remove('hidden');
+    playWinnerSound();
+    speak(`Congratulations! ${e.winnerName} reached the target! Starting a new round!`);
+    if (winnerHideTimer) clearTimeout(winnerHideTimer);
+    winnerHideTimer = setTimeout(() => winnerCard.classList.add('hidden'), 6000);
+  }
+
   function render(data) {
     const sorted = data.sorted || [];
     grid.innerHTML = sorted.map((c, i) => {
@@ -277,6 +291,7 @@
     // Only pop/bump for events that are new since the last poll (avoids replaying old ones).
     const newEvents = events.filter(e => e.ts > lastSeenEventTs);
     newEvents.slice().reverse().forEach(e => {
+      if (e.type === 'reset') { showWinnerCard(e); return; }
       if (!e.code) return; // e.g. like-bonus events aren't tied to a country
       bumpCard(e.code);
       showPointPopup(e.code, e.type === 'subscribe' ? '+100 🎉' : '+1', e.type === 'subscribe', e.authorName);
@@ -292,15 +307,6 @@
     });
     if (events.length) lastSeenEventTs = Math.max(lastSeenEventTs, events[0].ts);
 
-    const newCommentary = computeCommentary(sorted);
-    if (newCommentary.length) {
-      commentaryLog = [...newCommentary.reverse(), ...commentaryLog].slice(0, 6);
-      playOvertakeSound();
-      speak(newCommentary[newCommentary.length - 1]);
-    }
-    commentaryEl.innerHTML = commentaryLog.length
-      ? commentaryLog.slice(0, 2).map(line => `<div class="commentary-item">${line}</div>`).join('')
-      : '';
   }
 
   async function pollState() {
@@ -330,7 +336,7 @@
     const apiKey = el('input-api-key').value.trim();
     const videoId = el('input-video-id').value.trim();
     const startPoints = parseInt(el('input-start-points').value, 10) || 0;
-    targetScore = parseInt(el('input-target-score').value, 10) || 3700;
+    targetScore = parseInt(el('input-target-score').value, 10) || 5000;
     const subKeywords = el('input-sub-keywords').value;
 
     if (!apiKey || !videoId) {
@@ -362,7 +368,7 @@
   el('btn-demo').addEventListener('click', async () => {
     ensureAudio();
     const startPoints = parseInt(el('input-start-points').value, 10) || 0;
-    targetScore = parseInt(el('input-target-score').value, 10) || 3700;
+    targetScore = parseInt(el('input-target-score').value, 10) || 5000;
     const subKeywords = el('input-sub-keywords').value || 'subscribed, sub';
     try {
       await fetch('/api/demo', {
@@ -401,7 +407,7 @@
       if (status.videoId) el('input-video-id').value = status.videoId;
 
       if (status.mode === 'live') {
-        targetScore = status.targetScore || 3700;
+        targetScore = status.targetScore || 5000;
         showBoard();
         startBannerRotation();
         startPolling();

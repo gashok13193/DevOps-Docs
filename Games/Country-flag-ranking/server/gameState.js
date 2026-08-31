@@ -171,6 +171,20 @@ function reset(startingPoints) {
   save();
 }
 
+// Resets only the country scores/bonus pool for a new round once a country reaches the target
+// score — viewer comment counts, levels, and milestone progress are intentionally kept intact.
+function resetForNewRound(startingPoints, winnerName, targetScore) {
+  const countries = {};
+  for (const c of COUNTRIES) countries[c.code] = startingPoints;
+  state.countries = countries;
+  state.bonusPoints = 0;
+  pushEvent({
+    type: 'reset', code: null, delta: 0, winnerName, targetScore,
+    label: `🏆 ${winnerName} reached ${targetScore} pts! Scores reset for a new round — back to ${startingPoints} each.`,
+  });
+  save();
+}
+
 function setLastKnownLikeCount(n) {
   state.lastKnownLikeCount = n;
   save();
@@ -184,6 +198,6 @@ module.exports = {
   load, save, hasProcessedMessage, markMessageProcessed,
   addCommentPoint, addSubscribeBonus, addLikeBonus,
   getLastCountryForAuthor, getSortedCountries, getBonusPoints,
-  getRecentEvents, reset, setLastKnownLikeCount, getLastKnownLikeCount,
+  getRecentEvents, reset, resetForNewRound, setLastKnownLikeCount, getLastKnownLikeCount,
   getUserStats, levelForComments,
 };

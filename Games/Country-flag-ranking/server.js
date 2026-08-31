@@ -15,7 +15,7 @@ const CONFIG_FILE = path.join(__dirname, 'server', 'config.json');
 let session = {
   mode: 'idle', // 'idle' | 'live' | 'demo'
   videoId: null,
-  targetScore: 3700,
+  targetScore: 5000,
   subKeywords: ['subscribed', 'sub'],
   startPoints: 1000,
   statusText: 'Not started yet.',
@@ -26,7 +26,10 @@ let lastChatActivity = Date.now();
 let lastFillerSubscribeTime = 0;
 const IDLE_THRESHOLD_MS = 30000;
 const FILLER_SUBSCRIBE_COOLDOWN_MS = 3 * 60 * 1000;
-const FILLER_NAMES = ['Fan92', 'ViewerX', 'StreamBuddy', 'NightOwl', 'ChatRider', 'PixelFan', 'QuickClap', 'GameLover'];
+const FILLER_NAMES = [
+  'Fan92-k9s', 'ViewerX-d7w', 'StreamBuddy-w6e', 'NightOwl-t2f',
+  'ChatRider-q8m', 'PixelFan-r5j', 'QuickClap-b3n', 'GameLover-h9x',
+];
 
 function parseKeywords(raw) {
   if (Array.isArray(raw)) return raw.map(s => String(s).trim().toLowerCase()).filter(Boolean);
@@ -51,6 +54,17 @@ function handleChatMessage(item) {
   if (isSubscribeMsg) {
     const targetCode = countryCode || GameState.getLastCountryForAuthor(authorId);
     if (targetCode) GameState.addSubscribeBonus(targetCode, authorName, authorId);
+  }
+  checkForWinAndReset();
+}
+
+// Once any country reaches the target score, start a fresh round: reset everyone back to
+// the starting points and leave a win announcement in the recent events feed.
+function checkForWinAndReset() {
+  if (session.mode === 'idle') return;
+  const leader = GameState.getSortedCountries()[0];
+  if (leader && leader.points >= session.targetScore) {
+    GameState.resetForNewRound(session.startPoints, leader.name, session.targetScore);
   }
 }
 
@@ -82,6 +96,7 @@ function startIdleFiller() {
     } else {
       GameState.addCommentPoint(country.code, `filler-${name}`, name);
     }
+    checkForWinAndReset();
   }, 4000);
 }
 
@@ -135,7 +150,10 @@ function startDemoInternal(cfg) {
     subKeywords: parseKeywords(cfg.subKeywords), startPoints: cfg.startPoints,
     statusText: '🧪 Demo mode — simulating chat activity (no real YouTube data).',
   };
-  const sampleNames = ['Aria', 'Leo', 'Maya', 'Noah', 'Zoe', 'Kai', 'Ivy', 'Omar'];
+  const sampleNames = [
+    'Aria-k9s', 'Leo-d7w', 'Maya-c4p', 'Noah-t2f', 'Zoe-q8m', 'Kai-r5j', 'Ivy-b3n', 'Omar-h9x',
+    'FirasGaming-p4c', 'HarshitaPrajapat-m3v', 'Yesenia-x7z',
+  ];
   demoTimerHandle = setInterval(() => {
     const country = COUNTRIES[Math.floor(Math.random() * COUNTRIES.length)];
     const name = sampleNames[Math.floor(Math.random() * sampleNames.length)];
@@ -143,6 +161,7 @@ function startDemoInternal(cfg) {
     if (roll < 0.08) GameState.addSubscribeBonus(country.code, name, `demo-${name}`);
     else if (roll < 0.15) GameState.addLikeBonus(1);
     else GameState.addCommentPoint(country.code, `demo-${name}`, name);
+    checkForWinAndReset();
   }, 900);
 }
 
@@ -250,7 +269,7 @@ const server = http.createServer(async (req, res) => {
       const cfg = {
         apiKey: String(body.apiKey).trim(), videoId,
         subKeywords: body.subKeywords, startPoints: parseInt(body.startPoints, 10) || 0,
-        targetScore: parseInt(body.targetScore, 10) || 3700,
+        targetScore: parseInt(body.targetScore, 10) || 5000,
       };
       saveConfigToDisk(cfg);
       startLiveInternal(cfg);
@@ -266,7 +285,7 @@ const server = http.createServer(async (req, res) => {
       const body = await readJsonBody(req);
       startDemoInternal({
         subKeywords: body.subKeywords, startPoints: parseInt(body.startPoints, 10) || 0,
-        targetScore: parseInt(body.targetScore, 10) || 3700,
+        targetScore: parseInt(body.targetScore, 10) || 5000,
       });
       sendJson(res, 200, { ok: true });
     } catch (err) {

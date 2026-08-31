@@ -31,7 +31,7 @@
       </label>
 
       <label>Target score <span class="hint-small">(race goal shown on the race bar)</span>
-        <input id="input-target-score" type="number" value="3700" min="1" />
+        <input id="input-target-score" type="number" value="5000" min="1" />
       </label>
 
       <div class="setup-actions">
@@ -47,22 +47,22 @@
   <!-- Board screen -->
   <section id="board-screen" class="screen hidden">
     <header class="board-header">
-      <div class="title-row">
+      <div class="header-icons">
         <span class="live-dot"></span>
-        <h1>Comment Your Country!</h1>
         <button id="btn-mute" class="icon-btn" title="Mute sounds">🔊</button>
         <button id="btn-settings" class="icon-btn" title="Settings">⚙️</button>
       </div>
-      <button id="btn-enable-sound" class="enable-sound-btn hidden">🔊 Tap to enable sound</button>
-      <div class="banner-row">
-        <span id="sub-banner" class="sub-banner">Subscribe = +100 Points</span>
-        <span class="target-badge">TARGET<br /><span id="target-value">0</span></span>
+      <div class="title-row">
+        <span id="title-emoji-left" class="title-emoji">🌍</span>
+        <h1 id="neon-title" class="neon-title">WHERE ARE<br />YOU FROM?</h1>
+        <span id="title-emoji-right" class="title-emoji">😎</span>
       </div>
+      <button id="btn-enable-sound" class="enable-sound-btn hidden">🔊 Tap to enable sound</button>
       <div id="leader-banner" class="leader-banner">🏆 Waiting for votes…</div>
+      <div class="race-target-label">🎯 Target: <span id="target-value">0</span></div>
       <div id="race-track" class="race-track">
         <div class="race-finish"></div>
       </div>
-      <div id="commentary" class="commentary"></div>
       <div class="status-row">
         <span id="status-text">Connecting…</span>
         <span id="bonus-badge" class="bonus-badge">❤️ Bonus: 0</span>
@@ -91,6 +91,14 @@
         <div id="subscribe-country" class="subscribe-country">Country</div>
         <div class="subscribe-points">+100 Points! 🎉</div>
       </div>
+    </div>
+
+    <!-- Winner celebration card: shown when a country hits the target score and the board resets -->
+    <div id="winner-card" class="winner-card hidden">
+      <div class="winner-badge">🏆 WE HAVE A WINNER! 🏆</div>
+      <div id="winner-name" class="winner-name">Country</div>
+      <div id="winner-message" class="winner-message">Reached 5000 pts!</div>
+      <div class="winner-sub">🔄 New round starting — everyone back to the start!</div>
     </div>
 
     <main id="flag-grid" class="flag-grid"></main>

@@ -46,12 +46,29 @@ html, body {
 /* ---------- Board screen ---------- */
 .board-header {
   position: sticky; top: 0; z-index: 5;
-  background: linear-gradient(180deg, #3a1250, #2b0f3a 90%);
+  background:
+    radial-gradient(1px 1px at 10% 20%, rgba(255,255,255,0.6) 1px, transparent 1px),
+    radial-gradient(1px 1px at 80% 15%, rgba(255,255,255,0.5) 1px, transparent 1px),
+    radial-gradient(1px 1px at 40% 60%, rgba(255,255,255,0.4) 1px, transparent 1px),
+    radial-gradient(1px 1px at 65% 80%, rgba(255,255,255,0.5) 1px, transparent 1px),
+    radial-gradient(1px 1px at 25% 85%, rgba(255,255,255,0.4) 1px, transparent 1px),
+    linear-gradient(180deg, #1a0b2e, #2b0f3a 90%);
   padding: 10px 12px 8px;
   border-bottom: 2px solid rgba(255,255,255,0.15);
 }
-.title-row { display: flex; align-items: center; gap: 8px; }
-.title-row h1 { font-size: 16px; margin: 0; flex: 1; font-weight: 800; letter-spacing: 0.3px; }
+.header-icons {
+  position: absolute; top: 8px; right: 10px; z-index: 6;
+  display: flex; align-items: center; gap: 8px;
+}
+.title-row { position: relative; display: flex; align-items: center; justify-content: center; gap: 8px; }
+.title-emoji { font-size: 26px; }
+.neon-title {
+  margin: 0; text-align: center; text-transform: uppercase;
+  font-size: 20px; line-height: 1.15; font-weight: 900; letter-spacing: 1px;
+  color: #e8d6ff;
+  text-shadow: 0 0 4px #fff, 0 0 10px #d94dff, 0 0 20px #a239ff, 0 0 32px #7a2cff;
+  transition: opacity 0.2s ease;
+}
 .live-dot {
   width: 10px; height: 10px; border-radius: 50%; background: #ff3b3b;
   box-shadow: 0 0 8px #ff3b3b; animation: pulse 1.4s infinite;
@@ -66,24 +83,6 @@ html, body {
 }
 .enable-sound-btn.hidden { display: none; }
 
-.banner-row {
-  display: flex; align-items: center; gap: 8px; margin-top: 6px;
-}
-.sub-banner {
-  flex: 1;
-  background: linear-gradient(135deg, #ff2fb0, #7a2cff);
-  color: #fff; text-align: center;
-  font-size: 15px; font-weight: 800;
-  padding: 8px 6px; border-radius: 10px;
-  box-shadow: 0 2px 0 rgba(0,0,0,0.25);
-}
-.target-badge {
-  background: #ffcf33; color: #402800;
-  font-size: 9px; font-weight: 800; text-align: center; line-height: 1.2;
-  padding: 5px 10px; border-radius: 8px; white-space: nowrap;
-}
-.target-badge #target-value { font-size: 14px; }
-
 .leader-banner {
   margin-top: 6px;
   text-align: center;
@@ -95,17 +94,9 @@ html, body {
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 
-.commentary {
-  margin-top: 6px; min-height: 16px; max-height: 48px; overflow: hidden;
-  font-size: 12px; font-weight: 700; line-height: 1.4;
-}
-.commentary-item {
-  color: #ff8a3d; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-  animation: commentary-pop 0.4s ease;
-}
-@keyframes commentary-pop {
-  0% { opacity: 0; transform: translateY(-4px); }
-  100% { opacity: 1; transform: translateY(0); }
+.race-target-label {
+  margin-top: 6px; text-align: center;
+  font-size: 12px; font-weight: 800; color: #ffcf33;
 }
 
 .milestone-card {
@@ -152,6 +143,27 @@ html, body {
 .subscribe-country { font-size: 12px; color: #ffe5f5; font-weight: 700; }
 .subscribe-points { font-size: 15px; color: #ffe08a; font-weight: 800; margin-top: 6px; }
 
+.winner-card {
+  position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+  z-index: 30; width: min(340px, 90vw);
+  text-align: center;
+  background: linear-gradient(160deg, #402800, #7a5200);
+  border: 3px solid #ffcf33; border-radius: 18px;
+  box-shadow: 0 12px 32px rgba(0,0,0,0.6), 0 0 40px rgba(255,207,51,0.6);
+  padding: 20px 16px;
+  animation: winner-pop 0.5s ease;
+}
+.winner-card.hidden { display: none; }
+@keyframes winner-pop {
+  0% { opacity: 0; transform: translate(-50%, -50%) scale(0.7); }
+  60% { opacity: 1; transform: translate(-50%, -50%) scale(1.08); }
+  100% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+}
+.winner-badge { font-size: 16px; font-weight: 900; color: #ffcf33; letter-spacing: 1px; }
+.winner-name { font-size: 26px; font-weight: 900; color: #fff; margin-top: 10px; text-shadow: 0 0 12px #ffcf33; }
+.winner-message { font-size: 14px; font-weight: 700; color: #ffe08a; margin-top: 6px; }
+.winner-sub { font-size: 12px; font-weight: 700; color: #ffd8a0; margin-top: 10px; }
+
 .race-track {
   position: relative;
   height: 62px;
@@ -193,9 +205,9 @@ html, body {
   max-height: 92px; overflow: hidden;
 }
 .ticker-item {
-  color: #ffe08a; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  color: #4ade80; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
-.ticker-item:first-child { color: #fff; font-weight: 700; }
+.ticker-item:first-child { color: #86efac; }
 
 .flag-grid {
   display: grid;
