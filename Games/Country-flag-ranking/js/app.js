@@ -87,8 +87,13 @@
     beep(1046.5, 0.35, 0.45);
   }
 
-  // Soft ambient background melody: a gentle looping arpeggio, quiet enough to sit behind speech/SFX.
-  const MELODY_NOTES = [523.25, 659.25, 783.99, 1046.5, 783.99, 659.25];
+  // Upbeat looping theme, mixed below speech and scoring effects.
+  const MELODY_STEPS = [
+    [392.0, 0.34, 'triangle'], [523.25, 0.24, 'sine'],
+    [659.25, 0.34, 'triangle'], [783.99, 0.24, 'sine'],
+    [698.46, 0.34, 'triangle'], [880.0, 0.24, 'sine'],
+    [783.99, 0.42, 'triangle'], [523.25, 0.24, 'sine'],
+  ];
   let musicTimer = null;
   let melodyIndex = 0;
 
@@ -97,9 +102,10 @@
     melodyIndex = 0;
     musicTimer = setInterval(() => {
       if (!soundEnabled || !audioCtx) return;
-      beep(MELODY_NOTES[melodyIndex % MELODY_NOTES.length], 0.6, 0, 'sine', 0.03);
+      const [frequency, duration, type] = MELODY_STEPS[melodyIndex % MELODY_STEPS.length];
+      beep(frequency, duration, 0, type, 0.055);
       melodyIndex++;
-    }, 600);
+    }, 420);
   }
 
   function stopMelody() {
