@@ -19,6 +19,7 @@
   const milestoneCard = el('milestone-card');
   const subscribeCard = el('subscribe-card');
   const winnerCard = el('winner-card');
+  const multiplierBadge = el('multiplier-badge');
 
   let bannerTimer = null;
   let pollTimer = null;
@@ -58,6 +59,19 @@
     beep(660, 0.09, 0);
     beep(880, 0.09, 0.09);
     beep(1320, 0.14, 0.18);
+  }
+
+  function playBoostSound() {
+    beep(440, 0.08, 0);
+    beep(660, 0.08, 0.08);
+    beep(990, 0.12, 0.16);
+  }
+
+  function playLikeGoalSound() {
+    beep(523.25, 0.1, 0);
+    beep(659.25, 0.1, 0.1);
+    beep(783.99, 0.1, 0.2);
+    beep(1046.5, 0.2, 0.3);
   }
 
   function playWinnerSound() {
@@ -294,6 +308,17 @@
     winnerHideTimer = setTimeout(() => winnerCard.classList.add('hidden'), 6000);
   }
 
+  let multiplierHideTimer = null;
+
+  // Flashes the "2X POINTS" badge for 60s whenever a like-count goal is reached.
+  function showLikeGoalBoost(e) {
+    multiplierBadge.classList.remove('hidden');
+    playLikeGoalSound();
+    speak(`${e.likeGoal} likes! Flags are moving twice as fast for the next minute!`);
+    if (multiplierHideTimer) clearTimeout(multiplierHideTimer);
+    multiplierHideTimer = setTimeout(() => multiplierBadge.classList.add('hidden'), 60000);
+  }
+
   function render(data) {
     const sorted = data.sorted || [];
     grid.innerHTML = sorted.map((c, i) => {
@@ -335,6 +360,15 @@
     const newEvents = events.filter(e => e.ts > lastSeenEventTs);
     newEvents.slice().reverse().forEach(e => {
       if (e.type === 'reset') { showWinnerCard(e); return; }
+      if (e.type === 'like-goal') { showLikeGoalBoost(e); return; }
+      if (e.type === 'boost') {
+        bumpCard(e.code);
+        const countryName = (sorted.find(c => c.code === e.code) || {}).name || e.code.toUpperCase();
+        showPointPopup(e.code, `🚀 +${e.delta} SURGE!`, true, null);
+        playBoostSound();
+        speak(`${countryName} surges ahead!`);
+        return;
+      }
       if (!e.code) return; // e.g. like-bonus events aren't tied to a country
       bumpCard(e.code);
       showPointPopup(e.code, e.type === 'subscribe' ? '+100 🎉' : '+1', e.type === 'subscribe', e.authorName);

@@ -22,6 +22,9 @@ let session = {
 };
 let demoTimerHandle = null;
 let idleCommentTimer = null;
+let boostTimer = null;
+let boostSnapshot = {};
+let demoLikeCount = 0;
 let lastChatActivity = Date.now();
 const IDLE_THRESHOLD_MS = 30000;
 const FILLER_NAMES = [
@@ -69,9 +72,34 @@ function checkForWinAndReset() {
 function stopAll(nextStatusText) {
   if (demoTimerHandle) { clearInterval(demoTimerHandle); demoTimerHandle = null; }
   stopIdleFiller();
+  stopBoostTimer();
   YouTube.stop();
   session.mode = 'idle';
   session.statusText = nextStatusText || 'Stopped.';
+}
+
+// Every 30 seconds, celebrate whichever country gained the most points since the last check —
+// gives viewers a periodic, exciting payoff worth sticking around for (per streaming feedback).
+function startBoostTimer() {
+  stopBoostTimer();
+  boostSnapshot = {};
+  boostTimer = setInterval(() => {
+    if (session.mode === 'idle') return;
+    const sorted = GameState.getSortedCountries();
+    let biggest = null;
+    for (const c of sorted) {
+      const prev = boostSnapshot[c.code] ?? c.points;
+      const gain = c.points - prev;
+      if (gain > 0 && (!biggest || gain > biggest.gain)) biggest = { code: c.code, name: c.name, gain };
+    }
+    if (biggest) GameState.announceBoost(biggest.code, biggest.name, biggest.gain);
+    boostSnapshot = Object.fromEntries(sorted.map(c => [c.code, c.points]));
+  }, 30000);
+}
+
+function stopBoostTimer() {
+  if (boostTimer) clearInterval(boostTimer);
+  boostTimer = null;
 }
 
 // While connected to a real live stream, if no real chat message has arrived for
@@ -92,6 +120,8 @@ function startIdleFiller() {
       GameState.addSubscribeBonus(country.code, name, `filler-${name}`);
     } else if (roll < 0.15) {
       GameState.addLikeBonus(1);
+      demoLikeCount += 1;
+      GameState.checkLikeGoal(demoLikeCount);
     } else {
       GameState.addCommentPoint(country.code, `filler-${name}`, name);
     }
@@ -109,12 +139,14 @@ function startLiveInternal(cfg) {
   GameState.load(cfg.videoId, cfg.startPoints);
   YouTube.init(cfg.apiKey);
   lastChatActivity = Date.now();
+  demoLikeCount = 0;
   session = {
     mode: 'live', videoId: cfg.videoId, targetScore: cfg.targetScore,
     subKeywords: parseKeywords(cfg.subKeywords), startPoints: cfg.startPoints,
     statusText: 'Connecting to live chat…',
   };
   startIdleFiller();
+  startBoostTimer();
   connectChat(cfg);
 }
 
@@ -139,7 +171,7 @@ function connectChat(cfg) {
     YouTube.pollChat(info.liveChatId, messages => {
       messages.forEach(handleChatMessage);
     }, err => {
-      session.statusText = `⚠️ Chat error: ${err.message}`;
+      console.error('Chat poll error:', err.message); // logged to terminal only, not shown on screen
       const staleOrUnreachable = /cannot be found|not found|ended|fetch failed/i.test(err.message || '');
       if (staleOrUnreachable) {
         // Stop the stale retry loop and fetch a brand-new chat ID instead of looping forever.
@@ -154,10 +186,11 @@ function connectChat(cfg) {
       const last = GameState.getLastKnownLikeCount();
       if (last != null && likeCount > last) GameState.addLikeBonus(likeCount - last);
       GameState.setLastKnownLikeCount(likeCount);
-    }, err => console.warn('Like poll error', err), 60000); // 60s: likes don't need near-real-time polling, saves quota
+      GameState.checkLikeGoal(likeCount);
+    }, err => console.warn('Like poll error:', err.message), 60000); // 60s: likes don't need near-real-time polling, saves quota
   }).catch(err => {
-    // Network hiccup fetching video info — retry rather than dropping into idle permanently.
-    session.statusText = `⚠️ Connection error: ${err.message}. Retrying…`;
+    // Network hiccup fetching video info — log it, retry, but don't alarm viewers on screen.
+    console.error('Connection error while fetching video info:', err.message);
     setTimeout(() => connectChat(cfg), 10000);
   });
 }
@@ -165,11 +198,13 @@ function connectChat(cfg) {
 function startDemoInternal(cfg) {
   stopAll();
   GameState.load('demo', cfg.startPoints);
+  demoLikeCount = 0;
   session = {
     mode: 'demo', videoId: null, targetScore: cfg.targetScore,
     subKeywords: parseKeywords(cfg.subKeywords), startPoints: cfg.startPoints,
     statusText: '🧪 Demo mode — simulating chat activity (no real YouTube data).',
   };
+  startBoostTimer();
   const sampleNames = [
     'Aria-k9s', 'Leo-d7w', 'Maya-c4p', 'Noah-t2f', 'Zoe-q8m', 'Kai-r5j', 'Ivy-b3n', 'Omar-h9x',
     'FirasGaming-p4c', 'HarshitaPrajapat-m3v', 'Yesenia-x7z',
@@ -178,9 +213,15 @@ function startDemoInternal(cfg) {
     const country = COUNTRIES[Math.floor(Math.random() * COUNTRIES.length)];
     const name = sampleNames[Math.floor(Math.random() * sampleNames.length)];
     const roll = Math.random();
-    if (roll < 0.08) GameState.addSubscribeBonus(country.code, name, `demo-${name}`);
-    else if (roll < 0.15) GameState.addLikeBonus(1);
-    else GameState.addCommentPoint(country.code, `demo-${name}`, name);
+    if (roll < 0.08) {
+      GameState.addSubscribeBonus(country.code, name, `demo-${name}`);
+    } else if (roll < 0.15) {
+      GameState.addLikeBonus(1);
+      demoLikeCount += 1;
+      GameState.checkLikeGoal(demoLikeCount);
+    } else {
+      GameState.addCommentPoint(country.code, `demo-${name}`, name);
+    }
     checkForWinAndReset();
   }, 900);
 }

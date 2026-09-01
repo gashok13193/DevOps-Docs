@@ -28,6 +28,9 @@ function freshState(startingPoints) {
     lastCountryByAuthor: {},
     userStats: {}, // authorId -> { name, comments }
     lastKnownLikeCount: null,
+    likeGoalNext: 50, // next real-like-count milestone that triggers a 2x boost
+    multiplier: 1,
+    multiplierExpiresAt: 0,
     recentEvents: [], // newest first, capped
   };
 }
@@ -42,6 +45,9 @@ function load(videoId, startingPoints) {
         if (!(c.code in state.countries)) state.countries[c.code] = startingPoints;
       }
       if (!state.userStats) state.userStats = {};
+      if (state.likeGoalNext == null) state.likeGoalNext = 50;
+      if (state.multiplier == null) state.multiplier = 1;
+      if (state.multiplierExpiresAt == null) state.multiplierExpiresAt = 0;
       return state;
     } catch (e) {
       console.warn('Failed to parse saved state, starting fresh.', e);
@@ -113,15 +119,47 @@ function getUserStats(authorId) {
   return { comments: entry.comments, level: levelForComments(entry.comments), points: entry.points || 0 };
 }
 
+// Returns the currently active point multiplier (1 = normal, >1 while a like-goal boost is active).
+function currentMultiplier() {
+  return Date.now() < state.multiplierExpiresAt ? state.multiplier : 1;
+}
+
+// Activates a temporary point multiplier (e.g. 2x for 60s) once a like-count goal is reached.
+function activateMultiplier(mult, durationMs) {
+  state.multiplier = mult;
+  state.multiplierExpiresAt = Date.now() + durationMs;
+  save();
+}
+
+function getMultiplierInfo() {
+  return { multiplier: currentMultiplier(), expiresAt: state.multiplierExpiresAt };
+}
+
+// Checks the real cumulative like count against the next 50-like goal; if crossed, activates a
+// 2x boost, announces it in the events feed, and returns the goal value reached (or null).
+function checkLikeGoal(totalRealLikes) {
+  if (totalRealLikes < state.likeGoalNext) return null;
+  const reached = state.likeGoalNext;
+  state.likeGoalNext += 50;
+  activateMultiplier(2, 60000);
+  pushEvent({
+    type: 'like-goal', code: null, delta: 0, likeGoal: reached,
+    label: `🎉 ${reached} Likes! Flags moving 2x faster for the next 60 seconds!`,
+  });
+  save();
+  return reached;
+}
+
 function addCommentPoint(code, authorId, authorName) {
   if (!(code in state.countries)) return;
-  state.countries[code] += 1;
+  const mult = currentMultiplier();
+  state.countries[code] += 1 * mult;
   if (authorId) state.lastCountryByAuthor[authorId] = code;
-  const { comments, level, points } = bumpUserStats(authorId, authorName, 1, 1);
+  const { comments, level, points } = bumpUserStats(authorId, authorName, 1, 1 * mult);
   const milestone = comments > 0 && comments % MILESTONE_STEP === 0;
   pushEvent({
-    type: 'comment', code, delta: 1, authorId, authorName, comments, level,
-    label: `[Lvl ${level}] ${authorName || 'Someone'} (${comments} comments) → ${countryName(code)} +1`,
+    type: 'comment', code, delta: 1 * mult, authorId, authorName, comments, level,
+    label: `[Lvl ${level}] ${authorName || 'Someone'} (${comments} comments) → ${countryName(code)} +${1 * mult}`,
     ...(milestone ? { milestone: true, title: titleForLevel(level), stars: starsForLevel(level), totalPoints: points } : {}),
   });
   save();
@@ -130,11 +168,12 @@ function addCommentPoint(code, authorId, authorName) {
 
 function addSubscribeBonus(code, authorName, authorId) {
   if (!code || !(code in state.countries)) return false;
-  state.countries[code] += 100;
-  const { comments, level } = bumpUserStats(authorId, authorName, 0, 100);
+  const mult = currentMultiplier();
+  state.countries[code] += 100 * mult;
+  const { comments, level } = bumpUserStats(authorId, authorName, 0, 100 * mult);
   pushEvent({
-    type: 'subscribe', code, delta: 100, authorId, authorName, comments, level,
-    label: `[Lvl ${level}] ${authorName || 'Someone'} subscribed! → ${countryName(code)} +100`,
+    type: 'subscribe', code, delta: 100 * mult, authorId, authorName, comments, level,
+    label: `[Lvl ${level}] ${authorName || 'Someone'} subscribed! → ${countryName(code)} +${100 * mult}`,
   });
   save();
   return true;
@@ -145,6 +184,16 @@ function addLikeBonus(deltaLikes) {
   const gained = deltaLikes * 10;
   state.bonusPoints += gained;
   pushEvent({ type: 'like', code: null, delta: gained, label: `+${gained} bonus (video likes)` });
+  save();
+}
+
+// Announces whichever country gained the most points in the last boost window (e.g. 30s),
+// giving viewers a periodic, exciting payoff to watch for instead of only continuous chatter.
+function announceBoost(code, name, gain) {
+  pushEvent({
+    type: 'boost', code, delta: gain,
+    label: `🚀 ${name} surges ahead! +${gain} in the last 30 seconds!`,
+  });
   save();
 }
 
@@ -199,5 +248,6 @@ module.exports = {
   addCommentPoint, addSubscribeBonus, addLikeBonus,
   getLastCountryForAuthor, getSortedCountries, getBonusPoints,
   getRecentEvents, reset, resetForNewRound, setLastKnownLikeCount, getLastKnownLikeCount,
-  getUserStats, levelForComments,
+  getUserStats, levelForComments, currentMultiplier, activateMultiplier, getMultiplierInfo, checkLikeGoal,
+  announceBoost,
 };

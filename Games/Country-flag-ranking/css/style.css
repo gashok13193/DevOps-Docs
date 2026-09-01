@@ -207,6 +207,15 @@ html, body {
   font-size: 11px; font-weight: 700;
 }
 
+.multiplier-badge {
+  margin-top: 6px; text-align: center;
+  background: linear-gradient(135deg, #ffd700, #ff8a00); color: #402800;
+  font-size: 12px; font-weight: 900; padding: 5px; border-radius: 8px;
+  animation: multiplier-pulse 1s infinite;
+}
+.multiplier-badge.hidden { display: none; }
+@keyframes multiplier-pulse { 0%,100%{opacity:1} 50%{opacity:0.6} }
+
 .ticker {
   margin-top: 6px; font-size: 11px; line-height: 1.5; min-height: 18px;
   max-height: 92px; overflow: hidden;
