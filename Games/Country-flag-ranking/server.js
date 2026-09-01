@@ -198,7 +198,7 @@ function connectChat(cfg) {
     }
     videoInfoFailStreak = 0;
     noChatStreak = 0;
-    session.statusText = '🟢 Connected — comment your country in chat! (no API quota used for chat)';
+    session.statusText = '🟢 Connected — comment your country in chat!';
   }).catch(err => {
     console.error('Error starting youtube-chat:', err.message);
     setTimeout(() => connectChat(cfg), 10000);
