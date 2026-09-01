@@ -27,7 +27,10 @@ let boostTimer = null;
 let boostSnapshot = {};
 let demoLikeCount = 0;
 let lastChatActivity = Date.now();
+let chatReconnectTimer = null;
+let chatWatchdogTimer = null;
 const IDLE_THRESHOLD_MS = 45000;
+const CHAT_SILENCE_RECONNECT_MS = 120000;
 const FILLER_NAMES = [
   'Fan92-k9s', 'ViewerX-d7w', 'StreamBuddy-w6e', 'NightOwl-t2f',
   'ChatRider-q8m', 'PixelFan-r5j', 'QuickClap-b3n', 'GameLover-h9x',
@@ -65,6 +68,8 @@ function checkForWinAndReset() {
 
 function stopAll(nextStatusText) {
   if (demoTimerHandle) { clearInterval(demoTimerHandle); demoTimerHandle = null; }
+  if (chatReconnectTimer) { clearTimeout(chatReconnectTimer); chatReconnectTimer = null; }
+  if (chatWatchdogTimer) { clearInterval(chatWatchdogTimer); chatWatchdogTimer = null; }
   stopIdleFiller();
   stopBoostTimer();
   if (activeLiveChat) { activeLiveChat.stop(); activeLiveChat = null; }
@@ -153,9 +158,33 @@ let videoInfoFailStreak = 0;
 let noChatStreak = 0;
 let activeLiveChat = null;
 
+function scheduleChatReconnect(cfg, delayMs, statusText) {
+  if (session.mode !== 'live' || chatReconnectTimer) return;
+  session.statusText = statusText || 'Reconnecting to live chat…';
+  const previousLiveChat = activeLiveChat;
+  activeLiveChat = null;
+  if (previousLiveChat) previousLiveChat.stop('Restarting chat connection');
+  chatReconnectTimer = setTimeout(() => {
+    chatReconnectTimer = null;
+    connectChat(cfg);
+  }, delayMs);
+}
+
+function startChatWatchdog(cfg, liveChat) {
+  if (chatWatchdogTimer) clearInterval(chatWatchdogTimer);
+  chatWatchdogTimer = setInterval(() => {
+    if (session.mode !== 'live' || activeLiveChat !== liveChat) return;
+    if (Date.now() - lastChatActivity >= CHAT_SILENCE_RECONNECT_MS) {
+      scheduleChatReconnect(cfg, 3000, 'Reconnecting to live chat…');
+    }
+  }, 15000);
+}
+
 function connectChat(cfg) {
   if (session.mode !== 'live') return; // user stopped/reset in the meantime
-  if (activeLiveChat) { activeLiveChat.stop(); activeLiveChat = null; }
+  const previousLiveChat = activeLiveChat;
+  activeLiveChat = null;
+  if (previousLiveChat) previousLiveChat.stop();
 
   const liveChat = new LiveChat({ liveId: cfg.videoId });
   activeLiveChat = liveChat;
@@ -174,16 +203,17 @@ function connectChat(cfg) {
 
   liveChat.on('error', err => {
     console.error('youtube-chat error:', err && err.message ? err.message : err); // terminal only
+    if (activeLiveChat === liveChat) scheduleChatReconnect(cfg, 8000, 'Live chat connection interrupted. Reconnecting…');
   });
 
   liveChat.on('end', reason => {
     console.warn('youtube-chat ended:', reason || '(no reason given)');
     if (session.mode !== 'live' || activeLiveChat !== liveChat) return;
     noChatStreak += 1;
-    session.statusText = noChatStreak >= 3
+    const statusText = noChatStreak >= 3
       ? '📴 Live chat ended. If you\'re not going live again here, tap ⚙️ and start a new session with the current link.'
       : 'Reconnecting to live chat…';
-    setTimeout(() => connectChat(cfg), 8000);
+    scheduleChatReconnect(cfg, 8000, statusText);
   });
 
   liveChat.start().then(ok => {
@@ -193,15 +223,16 @@ function connectChat(cfg) {
       session.statusText = videoInfoFailStreak >= 3
         ? '📴 No active live chat found for this video for a while. Tap ⚙️ and enter the current live link.'
         : 'No active live chat found for this video. Is it live right now?';
-      setTimeout(() => connectChat(cfg), 15000);
+      scheduleChatReconnect(cfg, 15000, session.statusText);
       return;
     }
     videoInfoFailStreak = 0;
     noChatStreak = 0;
     session.statusText = '🟢 Connected — comment your country in chat!';
+    startChatWatchdog(cfg, liveChat);
   }).catch(err => {
     console.error('Error starting youtube-chat:', err.message);
-    setTimeout(() => connectChat(cfg), 10000);
+    scheduleChatReconnect(cfg, 10000, 'Live chat connection interrupted. Reconnecting…');
   });
 
   // Optional: only if a real Data API key was given, poll the official API for the real
