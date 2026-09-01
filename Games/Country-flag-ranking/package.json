@@ -1,0 +1,11 @@
+{
+  "name": "country-flag-ranking",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "youtube-chat": "^2.2.0"
+  }
+}

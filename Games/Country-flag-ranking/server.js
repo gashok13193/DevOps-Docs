@@ -4,6 +4,7 @@
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
+const { LiveChat } = require('youtube-chat');
 
 const YouTube = require('./js/youtube.js');
 const { COUNTRIES, findCountryInText } = require('./js/countries.js');
@@ -37,16 +38,9 @@ function parseKeywords(raw) {
   return String(raw || '').split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
 }
 
-function handleChatMessage(item) {
-  lastChatActivity = Date.now();
-  const id = item.id;
-  if (GameState.hasProcessedMessage(id)) return;
-  GameState.markMessageProcessed(id);
-
-  const text = item.snippet?.displayMessage || '';
-  const authorId = item.authorDetails?.channelId || null;
-  const authorName = item.authorDetails?.displayName || 'Someone';
-
+// Shared scoring logic for both real YouTube chat messages and manually-typed entries
+// (used when the operator reads chat by eye instead of relying on the YouTube API).
+function processCommentText(text, authorId, authorName) {
   const countryCode = findCountryInText(text);
   if (countryCode) GameState.addCommentPoint(countryCode, authorId, authorName);
 
@@ -56,7 +50,7 @@ function handleChatMessage(item) {
     const targetCode = countryCode || GameState.getLastCountryForAuthor(authorId);
     if (targetCode) GameState.addSubscribeBonus(targetCode, authorName, authorId);
   }
-  checkForWinAndReset();
+  return countryCode;
 }
 
 // Once any country reaches the target score, start a fresh round: reset everyone back to
@@ -73,6 +67,7 @@ function stopAll(nextStatusText) {
   if (demoTimerHandle) { clearInterval(demoTimerHandle); demoTimerHandle = null; }
   stopIdleFiller();
   stopBoostTimer();
+  if (activeLiveChat) { activeLiveChat.stop(); activeLiveChat = null; }
   YouTube.stop();
   session.mode = 'idle';
   session.statusText = nextStatusText || 'Stopped.';
@@ -137,7 +132,6 @@ function stopIdleFiller() {
 function startLiveInternal(cfg) {
   stopAll();
   GameState.load(cfg.videoId, cfg.startPoints);
-  YouTube.init(cfg.apiKey);
   lastChatActivity = Date.now();
   demoLikeCount = 0;
   session = {
@@ -150,62 +144,77 @@ function startLiveInternal(cfg) {
   connectChat(cfg);
 }
 
-// Fetches a fresh liveChatId and (re)starts polling. Called again automatically if the
-// chat ID goes stale mid-stream (e.g. the broadcast briefly reconnected on YouTube's side),
-// if the stream hasn't gone live yet, or after a transient network/fetch failure — instead
-// of retrying forever with a dead connection.
+// Reads live chat via the unofficial youtube-chat package (no Data API quota used at all for
+// chat — it reads YouTube's internal live-chat feed directly, the same way the web player does).
+// ⚠️ This is not an officially supported YouTube API; it could break if YouTube changes their
+// internal page structure, and carries the ToS caveats the youtube-chat project itself calls out.
+// The official Data API key, if provided, is now used ONLY for the optional real-like-count bonus.
 let videoInfoFailStreak = 0;
 let noChatStreak = 0;
+let activeLiveChat = null;
+
 function connectChat(cfg) {
   if (session.mode !== 'live') return; // user stopped/reset in the meantime
+  if (activeLiveChat) { activeLiveChat.stop(); activeLiveChat = null; }
 
-  YouTube.getVideoInfo(cfg.videoId).then(info => {
+  const liveChat = new LiveChat({ liveId: cfg.videoId });
+  activeLiveChat = liveChat;
+
+  liveChat.on('chat', chatItem => {
     if (session.mode !== 'live') return;
-    videoInfoFailStreak = 0;
-    if (info.likeCount != null) GameState.setLastKnownLikeCount(info.likeCount);
+    lastChatActivity = Date.now();
+    if (GameState.hasProcessedMessage(chatItem.id)) return;
+    GameState.markMessageProcessed(chatItem.id);
+    const text = (chatItem.message || [])
+      .map(part => ('text' in part ? part.text : (part.emojiText || part.alt || '')))
+      .join('');
+    processCommentText(text, chatItem.author.channelId, chatItem.author.name);
+    checkForWinAndReset();
+  });
 
-    if (!info.liveChatId) {
-      noChatStreak += 1;
-      session.statusText = noChatStreak >= 4
-        ? '📴 No active live chat on this video for a while. If you\'re not going live again here, tap ⚙️ and start a new session with the current link.'
+  liveChat.on('error', err => {
+    console.error('youtube-chat error:', err && err.message ? err.message : err); // terminal only
+  });
+
+  liveChat.on('end', reason => {
+    console.warn('youtube-chat ended:', reason || '(no reason given)');
+    if (session.mode !== 'live' || activeLiveChat !== liveChat) return;
+    noChatStreak += 1;
+    session.statusText = noChatStreak >= 3
+      ? '📴 Live chat ended. If you\'re not going live again here, tap ⚙️ and start a new session with the current link.'
+      : 'Reconnecting to live chat…';
+    setTimeout(() => connectChat(cfg), 8000);
+  });
+
+  liveChat.start().then(ok => {
+    if (session.mode !== 'live') return;
+    if (!ok) {
+      videoInfoFailStreak += 1;
+      session.statusText = videoInfoFailStreak >= 3
+        ? '📴 No active live chat found for this video for a while. Tap ⚙️ and enter the current live link.'
         : 'No active live chat found for this video. Is it live right now?';
       setTimeout(() => connectChat(cfg), 15000);
       return;
     }
+    videoInfoFailStreak = 0;
     noChatStreak = 0;
-    session.statusText = '🟢 Connected — comment your country in chat!';
+    session.statusText = '🟢 Connected — comment your country in chat! (no API quota used for chat)';
+  }).catch(err => {
+    console.error('Error starting youtube-chat:', err.message);
+    setTimeout(() => connectChat(cfg), 10000);
+  });
 
-    YouTube.pollChat(info.liveChatId, messages => {
-      messages.forEach(handleChatMessage);
-    }, err => {
-      console.error('Chat poll error:', err.message); // logged to terminal only, not shown on screen
-      const staleOrUnreachable = /cannot be found|not found|ended|no longer live|fetch failed/i.test(err.message || '');
-      if (staleOrUnreachable) {
-        // Stop the stale retry loop and fetch a brand-new chat ID instead of looping forever.
-        YouTube.stop();
-        YouTube.init(cfg.apiKey);
-        session.statusText = 'Reconnecting to live chat…';
-        setTimeout(() => connectChat(cfg), 8000);
-      }
-    });
-
+  // Optional: only if a real Data API key was given, poll the official API for the real
+  // video like count so the like-bonus/like-goal features keep working.
+  if (cfg.apiKey) {
+    YouTube.init(cfg.apiKey);
     YouTube.pollLikes(cfg.videoId, likeCount => {
       const last = GameState.getLastKnownLikeCount();
       if (last != null && likeCount > last) GameState.addLikeBonus(likeCount - last);
       GameState.setLastKnownLikeCount(likeCount);
       GameState.checkLikeGoal(likeCount);
-    }, err => console.warn('Like poll error:', err.message), 60000); // 60s: likes don't need near-real-time polling, saves quota
-  }).catch(err => {
-    // Network hiccup fetching video info — log it and keep retrying quietly at first, since this
-    // is usually transient. Only bother the viewer on screen if it keeps failing (video likely
-    // actually ended and needs a new video ID entered in Settings).
-    console.error('Connection error while fetching video info:', err.message);
-    videoInfoFailStreak += 1;
-    if (videoInfoFailStreak >= 3) {
-      session.statusText = '📴 This stream appears to have ended. Tap ⚙️ and start a new session with the current live video link.';
-    }
-    setTimeout(() => connectChat(cfg), 10000);
-  });
+    }, err => console.warn('Like poll error:', err.message), 60000); // 60s: saves quota
+  }
 }
 
 function startDemoInternal(cfg) {
@@ -254,7 +263,7 @@ function loadConfigFromDisk() {
 
 // Auto-resume a previously configured live session if the server restarts mid-stream.
 const savedConfig = loadConfigFromDisk();
-if (savedConfig && savedConfig.apiKey && savedConfig.videoId) {
+if (savedConfig && savedConfig.videoId) {
   startLiveInternal(savedConfig);
 }
 
@@ -268,13 +277,13 @@ function isBlockedPath(safePath) {
   return safePath === 'server' || safePath.startsWith('server/') || safePath.startsWith('server\\');
 }
 
-function serveStatic(res, pathname) {
+function serveStatic(res, pathname, defaultFile) {
   const decoded = decodeURIComponent(pathname);
   const normalized = path.normalize(decoded).replace(/^([/\\])+/, '');
   if (normalized.split(/[/\\]/).includes('..') || isBlockedPath(normalized)) {
     res.writeHead(403); res.end('Forbidden'); return;
   }
-  const relPath = normalized === '' ? 'index.html' : normalized;
+  const relPath = normalized === '' ? (defaultFile || 'index.html') : normalized;
   const filePath = path.join(ROOT, relPath);
   if (!filePath.startsWith(ROOT)) { res.writeHead(403); res.end('Forbidden'); return; }
   fs.readFile(filePath, (err, data) => {
@@ -331,8 +340,8 @@ const server = http.createServer(async (req, res) => {
   if (pathname === '/api/config' && req.method === 'POST') {
     try {
       const body = await readJsonBody(req);
-      if (!body.apiKey || !body.videoId) {
-        sendJson(res, 400, { ok: false, error: 'API key and video URL/ID are required.' });
+      if (!body.videoId) {
+        sendJson(res, 400, { ok: false, error: 'A video URL/ID is required.' });
         return;
       }
       const videoId = YouTube.extractVideoId(body.videoId);
@@ -341,7 +350,8 @@ const server = http.createServer(async (req, res) => {
         return;
       }
       const cfg = {
-        apiKey: String(body.apiKey).trim(), videoId,
+        apiKey: body.apiKey ? String(body.apiKey).trim() : null, // optional: only needed for the like-count bonus
+        videoId,
         subKeywords: body.subKeywords, startPoints: parseInt(body.startPoints, 10) || 0,
         targetScore: parseInt(body.targetScore, 10) || 5000,
       };
@@ -374,7 +384,42 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  // Manually award points by typing what a real viewer commented — useful as a free,
+  // quota-free fallback if reading chat via the YouTube API is unavailable or over quota.
+  // Restricted to the admin-only port so it never appears reachable from the public board.
+  if (pathname === '/api/manual' && req.method === 'POST') {
+    if (req.socket.localPort !== ADMIN_PORT) {
+      res.writeHead(403); res.end('Forbidden');
+      return;
+    }
+    if (session.mode === 'idle') {
+      sendJson(res, 400, { ok: false, error: 'Start Live or Demo mode first.' });
+      return;
+    }
+    try {
+      const body = await readJsonBody(req);
+      const text = String(body.text || '').trim();
+      const authorName = String(body.authorName || 'Operator').trim() || 'Operator';
+      if (!text) {
+        sendJson(res, 400, { ok: false, error: 'Comment text is required.' });
+        return;
+      }
+      const authorId = `manual-${authorName.toLowerCase()}`;
+      const countryCode = processCommentText(text, authorId, authorName);
+      checkForWinAndReset();
+      sendJson(res, 200, { ok: true, countryCode });
+    } catch (err) {
+      sendJson(res, 500, { ok: false, error: err.message });
+    }
+    return;
+  }
+
   if (req.method === 'GET') {
+    const isAdminPort = req.socket.localPort === ADMIN_PORT;
+    if (isAdminPort && (pathname === '/' || pathname === '/index.html')) {
+      serveStatic(res, '/admin.html');
+      return;
+    }
     serveStatic(res, pathname);
     return;
   }
@@ -383,7 +428,17 @@ const server = http.createServer(async (req, res) => {
 });
 
 const PORT = process.env.PORT || 8090;
+const ADMIN_PORT = process.env.ADMIN_PORT ? Number(process.env.ADMIN_PORT) : 8091;
+
 server.listen(PORT, () => {
   console.log(`Country Flag Ranking server running at http://localhost:${PORT}`);
   console.log('Open the same URL using this PC\'s LAN IP on your phone to view/control the identical live board.');
 });
+
+// Second listener on a separate port serves ONLY the admin (manual entry) page — it's the same
+// process/handler, so it shares the exact same live game state, but /api/manual only works here.
+const adminServer = http.createServer(server.listeners('request')[0]);
+adminServer.listen(ADMIN_PORT, () => {
+  console.log(`Admin (manual entry) panel running at http://localhost:${ADMIN_PORT} — keep this private, don't share it with viewers.`);
+});
+
