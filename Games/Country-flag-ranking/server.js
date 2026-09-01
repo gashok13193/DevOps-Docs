@@ -26,7 +26,7 @@ let boostTimer = null;
 let boostSnapshot = {};
 let demoLikeCount = 0;
 let lastChatActivity = Date.now();
-const IDLE_THRESHOLD_MS = 30000;
+const IDLE_THRESHOLD_MS = 45000;
 const FILLER_NAMES = [
   'Fan92-k9s', 'ViewerX-d7w', 'StreamBuddy-w6e', 'NightOwl-t2f',
   'ChatRider-q8m', 'PixelFan-r5j', 'QuickClap-b3n', 'GameLover-h9x',
@@ -103,10 +103,10 @@ function stopBoostTimer() {
 }
 
 // While connected to a real live stream, if no real chat message has arrived for
-// IDLE_THRESHOLD_MS, inject demo-like comment/subscribe/like events at the exact same lively
-// pace as Demo Mode, so the board never looks dead during quiet stretches. Reuses the small
-// FILLER_NAMES pool (not a fresh identity every tick) so comment counts build up toward
-// real 10/20/30... milestones over time, same as Demo Mode.
+// IDLE_THRESHOLD_MS (45s), inject demo-like comment/subscribe/like events every 10s so the
+// board never looks dead during quiet stretches, without drowning out real viewer comments.
+// Reuses the small FILLER_NAMES pool (not a fresh identity every tick) so comment counts build
+// up toward real 10/20/30... milestones over time.
 function startIdleFiller() {
   stopIdleFiller();
 
@@ -126,7 +126,7 @@ function startIdleFiller() {
       GameState.addCommentPoint(country.code, `filler-${name}`, name);
     }
     checkForWinAndReset();
-  }, 900);
+  }, 10000);
 }
 
 function stopIdleFiller() {
