@@ -30,6 +30,7 @@ let lastChatActivity = Date.now();
 let chatReconnectTimer = null;
 let chatWatchdogTimer = null;
 let chatConnected = false;
+let likesQuotaExhausted = false;
 const IDLE_THRESHOLD_MS = 45000;
 const CHAT_SILENCE_RECONNECT_MS = 60000;
 const FILLER_NAMES = [
@@ -143,6 +144,7 @@ function startLiveInternal(cfg) {
   GameState.load(cfg.videoId, cfg.startPoints);
   lastChatActivity = Date.now();
   chatConnected = false;
+  likesQuotaExhausted = false;
   demoLikeCount = 0;
   session = {
     mode: 'live', videoId: cfg.videoId, targetScore: cfg.targetScore,
@@ -245,14 +247,22 @@ function connectChat(cfg) {
 
   // Optional: only if a real Data API key was given, poll the official API for the real
   // video like count so the like-bonus/like-goal features keep working.
-  if (cfg.apiKey) {
+  if (cfg.apiKey && !likesQuotaExhausted) {
     YouTube.init(cfg.apiKey);
     YouTube.pollLikes(cfg.videoId, likeCount => {
       const last = GameState.getLastKnownLikeCount();
       if (last != null && likeCount > last) GameState.addLikeBonus(likeCount - last);
       GameState.setLastKnownLikeCount(likeCount);
       GameState.checkLikeGoal(likeCount);
-    }, err => console.warn('Like poll error:', err.message), 60000); // 60s: saves quota
+    }, err => {
+      if (/quota|dailyLimitExceeded|rateLimitExceeded/i.test(err.message || '')) {
+        likesQuotaExhausted = true;
+        YouTube.stop();
+        console.warn('Video-like polling stopped: YouTube API quota is exhausted. Live chat continues normally.');
+        return;
+      }
+      console.warn('Like poll error:', err.message);
+    }, 60000); // 60s: saves quota
   }
 }
 
