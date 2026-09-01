@@ -27,6 +27,7 @@ function freshState(startingPoints) {
     processedMessageIds: [],
     lastCountryByAuthor: {},
     userStats: {}, // authorId -> { name, comments }
+    subscriptionBonusAuthors: {}, // authorId -> true after their one-time +100 bonus
     lastKnownLikeCount: null,
     likeGoalNext: 50, // next real-like-count milestone that triggers a 2x boost
     multiplier: 1,
@@ -45,6 +46,7 @@ function load(videoId, startingPoints) {
         if (!(c.code in state.countries)) state.countries[c.code] = startingPoints;
       }
       if (!state.userStats) state.userStats = {};
+      if (!state.subscriptionBonusAuthors) state.subscriptionBonusAuthors = {};
       if (state.likeGoalNext == null) state.likeGoalNext = 50;
       if (state.multiplier == null) state.multiplier = 1;
       if (state.multiplierExpiresAt == null) state.multiplierExpiresAt = 0;
@@ -190,9 +192,11 @@ function addCommentPoint(code, authorId, authorName) {
 
 function addSubscribeBonus(code, authorName, authorId) {
   if (!code || !(code in state.countries)) return false;
+  if (authorId && state.subscriptionBonusAuthors[authorId]) return false;
   const previousRank = rankForCountry(code);
   const mult = currentMultiplier();
   state.countries[code] += 100 * mult;
+  if (authorId) state.subscriptionBonusAuthors[authorId] = true;
   const { comments, level } = bumpUserStats(authorId, authorName, 0, 100 * mult);
   pushEvent({
     type: 'subscribe', code, delta: 100 * mult, authorId, authorName, comments, level,
