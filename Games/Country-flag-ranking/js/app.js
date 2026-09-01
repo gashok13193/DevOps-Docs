@@ -177,6 +177,8 @@
     const third = sorted[2];
     if (third) facts.push(`🥉 ${third.name} is in 3rd place with ${third.points} pts!`);
     const nameOf = code => (sorted.find(c => c.code === code) || {}).name || (code || '').toUpperCase();
+    const overtakes = events.filter(e => e.type === 'overtake').slice(0, 3);
+    overtakes.forEach(overtake => facts.push(overtake.label));
     const lastSub = events.find(e => e.type === 'subscribe');
     if (lastSub) facts.push(`🔔 ${lastSub.authorName || 'Someone'} subscribed for ${nameOf(lastSub.code)}!`);
     const lastComment = events.find(e => e.type === 'comment');
@@ -191,7 +193,7 @@
       if (!liveCommentaryFacts.length) return;
       liveCommentaryIndex = (liveCommentaryIndex + 1) % liveCommentaryFacts.length;
       liveCommentaryEl.textContent = liveCommentaryFacts[liveCommentaryIndex];
-    }, 4000);
+    }, 2500);
   }
 
   function stopLiveCommentaryRotation() {
@@ -367,6 +369,13 @@
         showPointPopup(e.code, `🚀 +${e.delta} SURGE!`, true, null);
         playBoostSound();
         speak(`${countryName} surges ahead!`);
+        return;
+      }
+      if (e.type === 'overtake') {
+        bumpCard(e.code);
+        const mover = (sorted.find(c => c.code === e.code) || {}).name || e.code.toUpperCase();
+        const passed = (sorted.find(c => c.code === e.passedCode) || {}).name || e.passedCode.toUpperCase();
+        speak(`${mover} moved ahead of ${passed} into place ${e.newRank}!`);
         return;
       }
       if (!e.code) return; // e.g. like-bonus events aren't tied to a country

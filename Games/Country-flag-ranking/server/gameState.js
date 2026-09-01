@@ -65,7 +65,7 @@ function save() {
 
 function pushEvent(evt) {
   state.recentEvents.unshift({ ...evt, ts: Date.now() });
-  if (state.recentEvents.length > 20) state.recentEvents.length = 20;
+  if (state.recentEvents.length > 50) state.recentEvents.length = 50;
 }
 
 function hasProcessedMessage(id) {
@@ -150,8 +150,29 @@ function checkLikeGoal(totalRealLikes) {
   return reached;
 }
 
+function rankForCountry(code) {
+  return getSortedCountries().findIndex(country => country.code === code) + 1;
+}
+
+function announceTopFortyOvertake(code, previousRank, pointsAdded) {
+  const newRank = rankForCountry(code);
+  if (!previousRank || !newRank || newRank >= previousRank || newRank > 40) return;
+
+  const sorted = getSortedCountries();
+  const passed = sorted[newRank] || sorted[Math.min(previousRank - 1, sorted.length - 1)];
+  if (!passed) return;
+
+  const mover = countryName(code);
+  const verb = pointsAdded >= 100 ? 'crushed past' : 'moved ahead of';
+  pushEvent({
+    type: 'overtake', code, passedCode: passed.code, previousRank, newRank,
+    label: `⚡ ${mover} ${verb} ${passed.name}! #${previousRank} → #${newRank}`,
+  });
+}
+
 function addCommentPoint(code, authorId, authorName) {
   if (!(code in state.countries)) return;
+  const previousRank = rankForCountry(code);
   const mult = currentMultiplier();
   state.countries[code] += 1 * mult;
   if (authorId) state.lastCountryByAuthor[authorId] = code;
@@ -162,12 +183,14 @@ function addCommentPoint(code, authorId, authorName) {
     label: `[Lvl ${level}] ${authorName || 'Someone'} (${comments} comments) → ${countryName(code)} +${1 * mult}`,
     ...(milestone ? { milestone: true, title: titleForLevel(level), stars: starsForLevel(level), totalPoints: points } : {}),
   });
+  announceTopFortyOvertake(code, previousRank, 1 * mult);
   save();
   return { comments, level };
 }
 
 function addSubscribeBonus(code, authorName, authorId) {
   if (!code || !(code in state.countries)) return false;
+  const previousRank = rankForCountry(code);
   const mult = currentMultiplier();
   state.countries[code] += 100 * mult;
   const { comments, level } = bumpUserStats(authorId, authorName, 0, 100 * mult);
@@ -175,6 +198,7 @@ function addSubscribeBonus(code, authorName, authorId) {
     type: 'subscribe', code, delta: 100 * mult, authorId, authorName, comments, level,
     label: `[Lvl ${level}] ${authorName || 'Someone'} subscribed! → ${countryName(code)} +${100 * mult}`,
   });
+  announceTopFortyOvertake(code, previousRank, 100 * mult);
   save();
   return true;
 }
