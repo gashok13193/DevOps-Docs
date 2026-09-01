@@ -155,6 +155,7 @@ function startLiveInternal(cfg) {
 // if the stream hasn't gone live yet, or after a transient network/fetch failure — instead
 // of retrying forever with a dead connection.
 let videoInfoFailStreak = 0;
+let noChatStreak = 0;
 function connectChat(cfg) {
   if (session.mode !== 'live') return; // user stopped/reset in the meantime
 
@@ -164,17 +165,21 @@ function connectChat(cfg) {
     if (info.likeCount != null) GameState.setLastKnownLikeCount(info.likeCount);
 
     if (!info.liveChatId) {
-      session.statusText = 'No active live chat found for this video. Is it live right now?';
+      noChatStreak += 1;
+      session.statusText = noChatStreak >= 4
+        ? '📴 No active live chat on this video for a while. If you\'re not going live again here, tap ⚙️ and start a new session with the current link.'
+        : 'No active live chat found for this video. Is it live right now?';
       setTimeout(() => connectChat(cfg), 15000);
       return;
     }
+    noChatStreak = 0;
     session.statusText = '🟢 Connected — comment your country in chat!';
 
     YouTube.pollChat(info.liveChatId, messages => {
       messages.forEach(handleChatMessage);
     }, err => {
       console.error('Chat poll error:', err.message); // logged to terminal only, not shown on screen
-      const staleOrUnreachable = /cannot be found|not found|ended|fetch failed/i.test(err.message || '');
+      const staleOrUnreachable = /cannot be found|not found|ended|no longer live|fetch failed/i.test(err.message || '');
       if (staleOrUnreachable) {
         // Stop the stale retry loop and fetch a brand-new chat ID instead of looping forever.
         YouTube.stop();
