@@ -229,15 +229,29 @@ function buildCountryMatchers() {
 }
 
 const COUNTRY_MATCHERS = buildCountryMatchers();
+const COUNTRY_CODES = new Set(COUNTRIES.map(country => country.code));
 
-// Returns the country code of the first country name found in the given text, or null.
+function findCountryFlagEmoji(text) {
+  const flags = text.matchAll(/[\u{1F1E6}-\u{1F1FF}]{2}/gu);
+  for (const match of flags) {
+    const [firstSymbol, secondSymbol] = [...match[0]];
+    const first = firstSymbol.codePointAt(0);
+    const second = secondSymbol.codePointAt(0);
+
+    const code = String.fromCharCode(first - 0x1F1E6 + 65, second - 0x1F1E6 + 65).toLowerCase();
+    if (COUNTRY_CODES.has(code)) return code;
+  }
+  return null;
+}
+
+// Returns the country code of the first country name or standard flag emoji found in text.
 function findCountryInText(text) {
   if (!text) return null;
   const lower = text.toLowerCase();
   for (const m of COUNTRY_MATCHERS) {
     if (m.regex.test(lower)) return m.code;
   }
-  return null;
+  return findCountryFlagEmoji(text);
 }
 
 // Also usable from Node (server.js) via require('./js/countries.js'); no-op in the browser.
