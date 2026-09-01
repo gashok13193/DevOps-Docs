@@ -154,7 +154,7 @@ function connectChat(cfg) {
       const last = GameState.getLastKnownLikeCount();
       if (last != null && likeCount > last) GameState.addLikeBonus(likeCount - last);
       GameState.setLastKnownLikeCount(likeCount);
-    }, err => console.warn('Like poll error', err), 15000);
+    }, err => console.warn('Like poll error', err), 60000); // 60s: likes don't need near-real-time polling, saves quota
   }).catch(err => {
     // Network hiccup fetching video info — retry rather than dropping into idle permanently.
     session.statusText = `⚠️ Connection error: ${err.message}. Retrying…`;
