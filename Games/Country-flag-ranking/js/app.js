@@ -450,8 +450,8 @@
     targetScore = parseInt(el('input-target-score').value, 10) || 5000;
     const subKeywords = el('input-sub-keywords').value;
 
-    if (!apiKey || !videoId) {
-      showSetup('Please enter both an API key and a video URL/ID.');
+    if (!videoId) {
+      showSetup('Please enter a live video URL or ID.');
       return;
     }
     try {

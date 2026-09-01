@@ -14,7 +14,7 @@
       <h1>🌍 Country Flag Ranking</h1>
       <p class="hint">Connect this to your YouTube live stream. Comments with a country name score +1, a subscribe keyword scores +100, and rising video likes add a global bonus.</p>
 
-      <label>YouTube API Key
+      <label>YouTube API Key <span class="hint-small">(optional, enables video-like bonuses)</span>
         <input id="input-api-key" type="text" placeholder="AIza..." autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" />
       </label>
 
@@ -36,11 +36,11 @@
 
       <div class="setup-actions">
         <button id="btn-start" class="btn primary">Start Live Board</button>
-        <button id="btn-demo" class="btn secondary">Try Demo Mode (no API key)</button>
+        <button id="btn-demo" class="btn secondary">Try Demo Mode</button>
       </div>
 
       <p id="setup-error" class="error"></p>
-      <p class="hint-small">Need an API key? See <code>README.md</code> in this project folder for step-by-step setup.</p>
+      <p class="hint-small">An API key is only needed for video-like bonuses. See <code>README.md</code> for setup.</p>
     </div>
   </section>
 
