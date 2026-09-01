@@ -154,11 +154,13 @@ function startLiveInternal(cfg) {
 // chat ID goes stale mid-stream (e.g. the broadcast briefly reconnected on YouTube's side),
 // if the stream hasn't gone live yet, or after a transient network/fetch failure — instead
 // of retrying forever with a dead connection.
+let videoInfoFailStreak = 0;
 function connectChat(cfg) {
   if (session.mode !== 'live') return; // user stopped/reset in the meantime
 
   YouTube.getVideoInfo(cfg.videoId).then(info => {
     if (session.mode !== 'live') return;
+    videoInfoFailStreak = 0;
     if (info.likeCount != null) GameState.setLastKnownLikeCount(info.likeCount);
 
     if (!info.liveChatId) {
@@ -189,8 +191,14 @@ function connectChat(cfg) {
       GameState.checkLikeGoal(likeCount);
     }, err => console.warn('Like poll error:', err.message), 60000); // 60s: likes don't need near-real-time polling, saves quota
   }).catch(err => {
-    // Network hiccup fetching video info — log it, retry, but don't alarm viewers on screen.
+    // Network hiccup fetching video info — log it and keep retrying quietly at first, since this
+    // is usually transient. Only bother the viewer on screen if it keeps failing (video likely
+    // actually ended and needs a new video ID entered in Settings).
     console.error('Connection error while fetching video info:', err.message);
+    videoInfoFailStreak += 1;
+    if (videoInfoFailStreak >= 3) {
+      session.statusText = '📴 This stream appears to have ended. Tap ⚙️ and start a new session with the current live video link.';
+    }
     setTimeout(() => connectChat(cfg), 10000);
   });
 }
