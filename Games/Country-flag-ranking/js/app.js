@@ -28,6 +28,12 @@
   let soundEnabled = true;
   let audioCtx = null;
 
+  function escapeHtml(value) {
+    return String(value).replace(/[&<>'"]/g, character => ({
+      '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;',
+    }[character]));
+  }
+
   // Small synthesized "game" sound effects (no audio files needed, so nothing to host/license).
   function ensureAudio() {
     if (!audioCtx) {
@@ -182,8 +188,11 @@
     overtakes.forEach(overtake => facts.push(overtake.label));
     const lastSub = events.find(e => e.type === 'subscribe');
     if (lastSub) facts.push(`🔔 ${lastSub.authorName || 'Someone'} subscribed for ${nameOf(lastSub.code)}!`);
-    const lastComment = events.find(e => e.type === 'comment');
-    if (lastComment) facts.push(`💬 ${lastComment.authorName || 'Someone'} commented for ${nameOf(lastComment.code)}!`);
+    const lastComment = events.find(e => e.type === 'comment' || e.type === 'chat');
+    if (lastComment) {
+      const message = lastComment.text ? `: ${lastComment.text}` : ` commented for ${nameOf(lastComment.code)}!`;
+      facts.push(`💬 ${lastComment.authorName || 'Someone'}${message}`);
+    }
     return facts.length ? facts : ['💬 Comment your country to get on the board!'];
   }
 
@@ -354,7 +363,7 @@
 
     const events = data.recentEvents || [];
     ticker.innerHTML = events.length
-      ? events.slice(0, 5).map(e => `<div class="ticker-item">${e.label}</div>`).join('')
+      ? events.slice(0, 5).map(e => `<div class="ticker-item">${escapeHtml(e.label)}</div>`).join('')
       : '<div class="ticker-item">Waiting for chat activity…</div>';
     renderRaceTrack(sorted);
 

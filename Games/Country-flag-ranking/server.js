@@ -45,7 +45,8 @@ function parseKeywords(raw) {
 // (used when the operator reads chat by eye instead of relying on the YouTube API).
 function processCommentText(text, authorId, authorName) {
   const countryCode = findCountryInText(text);
-  if (countryCode) GameState.addCommentPoint(countryCode, authorId, authorName);
+  if (countryCode) GameState.addCommentPoint(countryCode, authorId, authorName, text);
+  else GameState.addChatMessage(authorName, text);
 
   const lower = text.toLowerCase();
   const isSubscribeMsg = session.subKeywords.some(k => k && lower.includes(k));

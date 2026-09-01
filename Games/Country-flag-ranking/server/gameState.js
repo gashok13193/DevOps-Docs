@@ -172,7 +172,7 @@ function announceTopFortyOvertake(code, previousRank, pointsAdded) {
   });
 }
 
-function addCommentPoint(code, authorId, authorName) {
+function addCommentPoint(code, authorId, authorName, commentText) {
   if (!(code in state.countries)) return;
   const previousRank = rankForCountry(code);
   const mult = currentMultiplier();
@@ -182,12 +182,23 @@ function addCommentPoint(code, authorId, authorName) {
   const milestone = comments > 0 && comments % MILESTONE_STEP === 0;
   pushEvent({
     type: 'comment', code, delta: 1 * mult, authorId, authorName, comments, level,
-    label: `[Lvl ${level}] ${authorName || 'Someone'} (${comments} comments) → ${countryName(code)} +${1 * mult}`,
+    text: String(commentText || '').trim().slice(0, 140),
+    label: `💬 [Lvl ${level}] ${authorName || 'Someone'} → ${countryName(code)} +${1 * mult}`,
     ...(milestone ? { milestone: true, title: titleForLevel(level), stars: starsForLevel(level), totalPoints: points } : {}),
   });
   announceTopFortyOvertake(code, previousRank, 1 * mult);
   save();
   return { comments, level };
+}
+
+function addChatMessage(authorName, text) {
+  const message = String(text || '').trim().slice(0, 140);
+  if (!message) return;
+  pushEvent({
+    type: 'chat', code: null, authorName, text: message,
+    label: `💬 ${authorName || 'Someone'}: ${message}`,
+  });
+  save();
 }
 
 function addSubscribeBonus(code, authorName, authorId) {
@@ -273,7 +284,7 @@ function getLastKnownLikeCount() {
 
 module.exports = {
   load, save, hasProcessedMessage, markMessageProcessed,
-  addCommentPoint, addSubscribeBonus, addLikeBonus,
+  addCommentPoint, addChatMessage, addSubscribeBonus, addLikeBonus,
   getLastCountryForAuthor, getSortedCountries, getBonusPoints,
   getRecentEvents, reset, resetForNewRound, setLastKnownLikeCount, getLastKnownLikeCount,
   getUserStats, levelForComments, currentMultiplier, activateMultiplier, getMultiplierInfo, checkLikeGoal,

@@ -280,6 +280,7 @@ function buildCountryMatchers() {
       regex: new RegExp('\\b' + escapeRegExp(m.term) + '\\b', 'i'),
       repeatedRegex: new RegExp('(?:' + escapeRegExp(m.term) + '){2,}', 'i'),
       compactRepeatedRegex: compactTerm === m.term ? null : new RegExp('(?:' + escapeRegExp(compactTerm) + '){2,}', 'i'),
+      fuzzyTerm: /^[a-z]{5,}$/.test(m.term) ? m.term : null,
       code: m.code,
     };
   });
@@ -287,6 +288,37 @@ function buildCountryMatchers() {
 
 const COUNTRY_MATCHERS = buildCountryMatchers();
 const COUNTRY_CODES = new Set(COUNTRIES.map(country => country.code));
+
+function damerauLevenshteinDistance(first, second) {
+  const distances = Array.from({ length: first.length + 1 }, (_, row) => [row]);
+  for (let column = 0; column <= second.length; column++) distances[0][column] = column;
+
+  for (let row = 1; row <= first.length; row++) {
+    for (let column = 1; column <= second.length; column++) {
+      const cost = first[row - 1] === second[column - 1] ? 0 : 1;
+      distances[row][column] = Math.min(
+        distances[row - 1][column] + 1,
+        distances[row][column - 1] + 1,
+        distances[row - 1][column - 1] + cost,
+      );
+      if (row > 1 && column > 1 && first[row - 1] === second[column - 2] && first[row - 2] === second[column - 1]) {
+        distances[row][column] = Math.min(distances[row][column], distances[row - 2][column - 2] + 1);
+      }
+    }
+  }
+  return distances[first.length][second.length];
+}
+
+function findCountryWithMinorTypo(text) {
+  const words = text.match(/[a-z]{5,}/g) || [];
+  for (const word of words) {
+    for (const matcher of COUNTRY_MATCHERS) {
+      if (matcher.fuzzyTerm && Math.abs(word.length - matcher.fuzzyTerm.length) <= 1
+        && damerauLevenshteinDistance(word, matcher.fuzzyTerm) <= 1) return matcher.code;
+    }
+  }
+  return null;
+}
 
 function findCountryFlagEmoji(text) {
   const flags = text.matchAll(/[\u{1F1E6}-\u{1F1FF}]{2}/gu);
@@ -311,7 +343,7 @@ function findCountryInText(text) {
   for (const m of COUNTRY_MATCHERS) {
     if (m.repeatedRegex.test(lower) || (m.compactRepeatedRegex && m.compactRepeatedRegex.test(lower))) return m.code;
   }
-  return findCountryFlagEmoji(text);
+  return findCountryWithMinorTypo(lower) || findCountryFlagEmoji(text);
 }
 
 // Also usable from Node (server.js) via require('./js/countries.js'); no-op in the browser.
