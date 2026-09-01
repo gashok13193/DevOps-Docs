@@ -274,10 +274,15 @@ function buildCountryMatchers() {
   }
   // Longest term first so "south korea" is checked before "korea".
   matchers.sort((a, b) => b.term.length - a.term.length);
-  return matchers.map(m => ({
-    regex: new RegExp('\\b' + escapeRegExp(m.term) + '\\b', 'i'),
-    code: m.code,
-  }));
+  return matchers.map(m => {
+    const compactTerm = m.term.replace(/\s+/g, '');
+    return {
+      regex: new RegExp('\\b' + escapeRegExp(m.term) + '\\b', 'i'),
+      repeatedRegex: new RegExp('(?:' + escapeRegExp(m.term) + '){2,}', 'i'),
+      compactRepeatedRegex: compactTerm === m.term ? null : new RegExp('(?:' + escapeRegExp(compactTerm) + '){2,}', 'i'),
+      code: m.code,
+    };
+  });
 }
 
 const COUNTRY_MATCHERS = buildCountryMatchers();
@@ -302,6 +307,9 @@ function findCountryInText(text) {
   const lower = text.toLowerCase();
   for (const m of COUNTRY_MATCHERS) {
     if (m.regex.test(lower)) return m.code;
+  }
+  for (const m of COUNTRY_MATCHERS) {
+    if (m.repeatedRegex.test(lower) || (m.compactRepeatedRegex && m.compactRepeatedRegex.test(lower))) return m.code;
   }
   return findCountryFlagEmoji(text);
 }

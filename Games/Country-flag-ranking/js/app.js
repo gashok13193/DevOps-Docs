@@ -165,6 +165,7 @@
   let liveCommentaryFacts = [];
   let liveCommentaryTimer = null;
   let liveCommentaryIndex = 0;
+  let subscriptionReminderTimer = null;
 
   // Builds a fresh list of "who's leading / who subscribed / who's commenting" facts from
   // the current state, so there's always something continuous to say even between events.
@@ -201,10 +202,25 @@
     liveCommentaryTimer = null;
   }
 
+  function startSubscriptionReminder() {
+    stopSubscriptionReminder();
+    subscriptionReminderTimer = setInterval(() => {
+      if ('speechSynthesis' in window && !window.speechSynthesis.speaking) {
+        speak('Subscribe for 100 points.');
+      }
+    }, 60000);
+  }
+
+  function stopSubscriptionReminder() {
+    if (subscriptionReminderTimer) clearInterval(subscriptionReminderTimer);
+    subscriptionReminderTimer = null;
+  }
+
   function showSetup(errorMsg) {
     stopPolling();
     stopBannerRotation();
     stopLiveCommentaryRotation();
+    stopSubscriptionReminder();
     stopMelody();
     setupScreen.classList.remove('hidden');
     boardScreen.classList.add('hidden');
@@ -444,6 +460,7 @@
       showBoard();
       startBannerRotation();
       startLiveCommentaryRotation();
+      startSubscriptionReminder();
       startPolling();
       startMelody();
       speak('Game on! Comment your country to score points!');
@@ -467,6 +484,7 @@
       showBoard();
       startBannerRotation();
       startLiveCommentaryRotation();
+      startSubscriptionReminder();
       startPolling();
       startMelody();
       speak('Game on! Comment your country to score points!');
@@ -499,6 +517,7 @@
         showBoard();
         startBannerRotation();
         startLiveCommentaryRotation();
+        startSubscriptionReminder();
         startPolling();
         // No button click happened on this device, so autoplay policies block audio until
         // the visitor taps something — show a one-time prompt to unlock sound/melody.
