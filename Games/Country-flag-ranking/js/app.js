@@ -20,10 +20,11 @@
   const subscribeCard = el('subscribe-card');
   const winnerCard = el('winner-card');
   const multiplierBadge = el('multiplier-badge');
+  const challengeBanner = el('challenge-banner');
 
   let bannerTimer = null;
   let pollTimer = null;
-  let targetScore = 5000;
+  let targetScore = 1000;
   let lastSeenEventTs = 0;
   let soundEnabled = true;
   let audioCtx = null;
@@ -150,9 +151,9 @@
 
   const BANNER_MESSAGES = [
     { left: '🌍', title: 'WHERE ARE<br />YOU FROM?', right: '😎' },
-    { left: '🔔', title: 'SUBSCRIBE =<br />GET +100 POINTS', right: '🔔' },
+    { left: '🔔', title: 'TYPE "INDIA SUB"<br />FOR +100', right: '🔔' },
     { left: '💬', title: 'COMMENT YOUR<br />COUNTRY = +1', right: '💬' },
-    { left: '❤️', title: 'LIKE THE VIDEO<br />= +10 BONUS', right: '❤️' },
+    { left: '❤️', title: 'TYPE "INDIA LIKE"<br />FOR +10', right: '❤️' },
   ];
 
   function startBannerRotation() {
@@ -190,6 +191,8 @@
     const third = sorted[2];
     if (third) facts.push(`🥉 ${third.name} is in 3rd place with ${third.points} pts!`);
     const nameOf = code => (sorted.find(c => c.code === code) || {}).name || (code || '').toUpperCase();
+    const challenge = events.find(e => e.type === 'challenge');
+    if (challenge) facts.push(`🎯 ${challenge.challenge.label}`);
     const overtakes = events.filter(e => e.type === 'overtake').slice(0, 3);
     overtakes.forEach(overtake => facts.push(overtake.label));
     const lastSub = events.find(e => e.type === 'subscribe');
@@ -298,7 +301,7 @@
     popup.style.left = `${30 + Math.random() * 40}%`;
     card.appendChild(popup);
     popup.addEventListener('animationend', () => popup.remove());
-    setTimeout(() => popup.remove(), 1500);
+    setTimeout(() => popup.remove(), 3200);
   }
 
   let milestoneHideTimer = null;
@@ -371,6 +374,19 @@
     }).join('');
     bonusBadge.textContent = `❤️ Bonus: ${data.bonusPoints || 0}`;
     statusText.textContent = data.statusText || '';
+    const challenge = data.activeChallenge;
+    if (challenge) {
+      const seconds = Math.max(0, Math.ceil((challenge.expiresAt - Date.now()) / 1000));
+      let progress = '';
+      if (challenge.type === 'sprint') {
+        const leadingVotes = Math.max(0, ...Object.values(challenge.votes || {}));
+        progress = ` ${leadingVotes}/${challenge.goal}`;
+      }
+      challengeBanner.textContent = `🎯 ${challenge.label} ${seconds}s${progress}`;
+      challengeBanner.classList.remove('hidden');
+    } else {
+      challengeBanner.classList.add('hidden');
+    }
 
     const events = data.recentEvents || [];
     ticker.innerHTML = events.length
@@ -412,6 +428,22 @@
         const mover = (sorted.find(c => c.code === e.code) || {}).name || e.code.toUpperCase();
         const passed = (sorted.find(c => c.code === e.passedCode) || {}).name || e.passedCode.toUpperCase();
         speak(`${mover} moved ahead of ${passed} into place ${e.newRank}!`);
+        return;
+      }
+      if (e.type === 'challenge') {
+        speak(e.challenge.label);
+        return;
+      }
+      if (e.type === 'challenge-win' || e.type === 'team-bonus' || e.type === 'streak') {
+        bumpCard(e.code);
+        showPointPopup(e.code, `+${e.delta} ${e.type === 'streak' ? '🔥' : '🎉'}`, true, e.authorName);
+        playBoostSound();
+        speak(e.type === 'streak' ? `${e.authorName || 'Someone'} is on a ${e.streak} vote streak!` : e.label);
+        return;
+      }
+      if (e.type === 'comeback' || e.type === 'first-voter' || e.type === 'supporter') {
+        if (e.code) bumpCard(e.code);
+        speak(e.label);
         return;
       }
       if (e.type === 'viewer-like') {
@@ -467,7 +499,7 @@
     const apiKey = el('input-api-key').value.trim();
     const videoId = el('input-video-id').value.trim();
     const startPoints = parseInt(el('input-start-points').value, 10) || 0;
-    targetScore = parseInt(el('input-target-score').value, 10) || 5000;
+    targetScore = parseInt(el('input-target-score').value, 10) || 1000;
     const subKeywords = el('input-sub-keywords').value;
     const likeKeywords = el('input-like-keywords').value;
 
@@ -502,7 +534,7 @@
   el('btn-demo').addEventListener('click', async () => {
     ensureAudio();
     const startPoints = parseInt(el('input-start-points').value, 10) || 0;
-    targetScore = parseInt(el('input-target-score').value, 10) || 5000;
+    targetScore = parseInt(el('input-target-score').value, 10) || 1000;
     const subKeywords = el('input-sub-keywords').value || 'subscribed, sub';
     const likeKeywords = el('input-like-keywords').value || 'liked, like';
     try {
@@ -545,7 +577,7 @@
       if (status.videoId) el('input-video-id').value = status.videoId;
 
       if (status.mode === 'live') {
-        targetScore = status.targetScore || 5000;
+        targetScore = status.targetScore || 1000;
         showBoard();
         startBannerRotation();
         startLiveCommentaryRotation();

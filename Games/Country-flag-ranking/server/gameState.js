@@ -27,12 +27,15 @@ function freshState(startingPoints) {
     processedMessageIds: [],
     lastCountryByAuthor: {},
     userStats: {}, // authorId -> { name, comments }
+    firstVoterByCountry: {}, // country code -> first voter name in this round
+    teamVoteCounts: {}, // country code -> valid country votes in this round
     subscriptionBonusAuthors: {}, // authorId -> true after their one-time +100 bonus
     likeBonusAuthors: {}, // authorId -> true after their one-time +10 bonus
     lastKnownLikeCount: null,
     likeGoalNext: 50, // next real-like-count milestone that triggers a 2x boost
     multiplier: 1,
     multiplierExpiresAt: 0,
+    activeChallenge: null,
     recentEvents: [], // newest first, capped
   };
 }
@@ -47,11 +50,14 @@ function load(videoId, startingPoints) {
         if (!(c.code in state.countries)) state.countries[c.code] = startingPoints;
       }
       if (!state.userStats) state.userStats = {};
+      if (!state.firstVoterByCountry) state.firstVoterByCountry = {};
+      if (!state.teamVoteCounts) state.teamVoteCounts = {};
       if (!state.subscriptionBonusAuthors) state.subscriptionBonusAuthors = {};
       if (!state.likeBonusAuthors) state.likeBonusAuthors = {};
       if (state.likeGoalNext == null) state.likeGoalNext = 50;
       if (state.multiplier == null) state.multiplier = 1;
       if (state.multiplierExpiresAt == null) state.multiplierExpiresAt = 0;
+      if (!('activeChallenge' in state)) state.activeChallenge = null;
       return state;
     } catch (e) {
       console.warn('Failed to parse saved state, starting fresh.', e);
@@ -139,6 +145,40 @@ function getMultiplierInfo() {
   return { multiplier: currentMultiplier(), expiresAt: state.multiplierExpiresAt };
 }
 
+function getActiveChallenge() {
+  if (state.activeChallenge && Date.now() >= state.activeChallenge.expiresAt) {
+    state.activeChallenge = null;
+    save();
+  }
+  return state.activeChallenge;
+}
+
+function startChallenge(challenge) {
+  state.activeChallenge = { ...challenge, startedAt: Date.now() };
+  pushEvent({ type: 'challenge', code: challenge.countryCode || null, challenge: state.activeChallenge, label: `🎯 ${challenge.label}` });
+  save();
+  return state.activeChallenge;
+}
+
+function challengeMultiplierFor(code, rank) {
+  const challenge = getActiveChallenge();
+  if (!challenge) return 1;
+  if (challenge.type === 'country-double' && challenge.countryCode === code) return 2;
+  if (challenge.type === 'underdog-double' && rank > 20) return 2;
+  return 1;
+}
+
+function updateViewerStreak(authorId, authorName) {
+  if (!authorId) return { streak: 0, bonus: 0 };
+  const entry = state.userStats[authorId] || (state.userStats[authorId] = { name: authorName, comments: 0, points: 0 });
+  const now = Date.now();
+  entry.name = authorName || entry.name;
+  entry.streak = now - (entry.lastVoteAt || 0) <= 90000 ? (entry.streak || 0) + 1 : 1;
+  entry.lastVoteAt = now;
+  const bonus = entry.streak === 3 ? 3 : entry.streak === 5 ? 5 : 0;
+  return { streak: entry.streak, bonus };
+}
+
 // Checks the real cumulative like count against the next 50-like goal; if crossed, activates a
 // 2x boost, announces it in the events feed, and returns the goal value reached (or null).
 function checkLikeGoal(totalRealLikes) {
@@ -177,18 +217,52 @@ function announceTopFortyOvertake(code, previousRank, pointsAdded) {
 function addCommentPoint(code, authorId, authorName, commentText) {
   if (!(code in state.countries)) return;
   const previousRank = rankForCountry(code);
-  const mult = currentMultiplier();
-  state.countries[code] += 1 * mult;
+  const mult = currentMultiplier() * challengeMultiplierFor(code, previousRank);
+  const votePoints = 1 * mult;
+  state.countries[code] += votePoints;
   if (authorId) state.lastCountryByAuthor[authorId] = code;
-  const { comments, level, points } = bumpUserStats(authorId, authorName, 1, 1 * mult);
+  const { comments, level, points } = bumpUserStats(authorId, authorName, 1, votePoints);
+  const { streak, bonus: streakBonus } = updateViewerStreak(authorId, authorName);
+  if (streakBonus) {
+    state.countries[code] += streakBonus;
+    bumpUserStats(authorId, authorName, 0, streakBonus);
+    pushEvent({ type: 'streak', code, delta: streakBonus, authorName, streak,
+      label: `🔥 ${authorName || 'Someone'} is on a ${streak}-vote streak! ${countryName(code)} +${streakBonus}` });
+  }
+  if (!state.firstVoterByCountry[code]) {
+    state.firstVoterByCountry[code] = authorName || 'Someone';
+    pushEvent({ type: 'first-voter', code, authorName,
+      label: `⭐ ${authorName || 'Someone'} is first for ${countryName(code)} this round!` });
+  }
+  state.teamVoteCounts[code] = (state.teamVoteCounts[code] || 0) + 1;
+  if (state.teamVoteCounts[code] % 25 === 0) {
+    state.countries[code] += 20;
+    pushEvent({ type: 'team-bonus', code, delta: 20, votes: state.teamVoteCounts[code],
+      label: `🤝 ${countryName(code)} reached ${state.teamVoteCounts[code]} team votes! +20 bonus` });
+  }
+  const challenge = getActiveChallenge();
+  if (challenge?.type === 'sprint') {
+    challenge.votes[code] = (challenge.votes[code] || 0) + 1;
+    if (!challenge.winnerCode && challenge.votes[code] >= challenge.goal) {
+      challenge.winnerCode = code;
+      state.countries[code] += challenge.bonus;
+      pushEvent({ type: 'challenge-win', code, delta: challenge.bonus,
+        label: `🏁 ${countryName(code)} won the sprint challenge! +${challenge.bonus}` });
+    }
+  }
   const milestone = comments > 0 && comments % MILESTONE_STEP === 0;
   pushEvent({
-    type: 'comment', code, delta: 1 * mult, authorId, authorName, comments, level,
+    type: 'comment', code, delta: votePoints, authorId, authorName, comments, level, streak,
     text: String(commentText || '').trim().slice(0, 140),
-    label: `💬 [Lvl ${level}] ${authorName || 'Someone'} → ${countryName(code)} +${1 * mult}`,
+    label: `💬 [Lvl ${level}] ${authorName || 'Someone'} → ${countryName(code)} +${votePoints}`,
     ...(milestone ? { milestone: true, title: titleForLevel(level), stars: starsForLevel(level), totalPoints: points } : {}),
   });
-  announceTopFortyOvertake(code, previousRank, 1 * mult);
+  const newRank = rankForCountry(code);
+  if (previousRank > 20 && newRank <= 20) {
+    pushEvent({ type: 'comeback', code, previousRank, newRank,
+      label: `🚀 Comeback alert! ${countryName(code)} charged from #${previousRank} to #${newRank}!` });
+  }
+  announceTopFortyOvertake(code, previousRank, votePoints + streakBonus);
   save();
   return { comments, level };
 }
@@ -256,6 +330,18 @@ function announceBoost(code, name, gain) {
   save();
 }
 
+function announceTopSupporter() {
+  const supporters = Object.entries(state.userStats)
+    .filter(([, stats]) => stats.points > 0)
+    .sort(([, first], [, second]) => second.points - first.points);
+  const [authorId, supporter] = supporters[0] || [];
+  if (!supporter) return null;
+  pushEvent({ type: 'supporter', code: state.lastCountryByAuthor[authorId] || null, authorName: supporter.name,
+    points: supporter.points, label: `🌟 Most active supporter: ${supporter.name || 'Someone'} with ${supporter.points} points!` });
+  save();
+  return supporter;
+}
+
 function getLastCountryForAuthor(authorId) {
   return state.lastCountryByAuthor[authorId] || null;
 }
@@ -286,6 +372,9 @@ function resetForNewRound(startingPoints, winnerName, targetScore) {
   for (const c of COUNTRIES) countries[c.code] = startingPoints;
   state.countries = countries;
   state.bonusPoints = 0;
+  state.firstVoterByCountry = {};
+  state.teamVoteCounts = {};
+  state.activeChallenge = null;
   pushEvent({
     type: 'reset', code: null, delta: 0, winnerName, targetScore,
     label: `🏆 ${winnerName} reached ${targetScore} pts! Scores reset for a new round — back to ${startingPoints} each.`,
@@ -308,5 +397,5 @@ module.exports = {
   getLastCountryForAuthor, getSortedCountries, getBonusPoints,
   getRecentEvents, reset, resetForNewRound, setLastKnownLikeCount, getLastKnownLikeCount,
   getUserStats, levelForComments, currentMultiplier, activateMultiplier, getMultiplierInfo, checkLikeGoal,
-  announceBoost,
+  getActiveChallenge, startChallenge, announceBoost, announceTopSupporter,
 };
