@@ -18,6 +18,7 @@ let session = {
   videoId: null,
   targetScore: 5000,
   subKeywords: ['subscribed', 'sub'],
+  likeKeywords: ['liked', 'like'],
   startPoints: 1000,
   statusText: 'Not started yet.',
 };
@@ -52,9 +53,14 @@ function processCommentText(text, authorId, authorName) {
 
   const lower = text.toLowerCase();
   const isSubscribeMsg = session.subKeywords.some(k => k && lower.includes(k));
+  const isLikeMsg = session.likeKeywords.some(k => k && lower.includes(k));
   if (isSubscribeMsg) {
     const targetCode = countryCode || GameState.getLastCountryForAuthor(authorId);
     if (targetCode) GameState.addSubscribeBonus(targetCode, authorName, authorId);
+  }
+  if (isLikeMsg) {
+    const targetCode = countryCode || GameState.getLastCountryForAuthor(authorId);
+    if (targetCode) GameState.addViewerLikeBonus(targetCode, authorName, authorId);
   }
   return countryCode;
 }
@@ -148,7 +154,7 @@ function startLiveInternal(cfg) {
   demoLikeCount = 0;
   session = {
     mode: 'live', videoId: cfg.videoId, targetScore: cfg.targetScore,
-    subKeywords: parseKeywords(cfg.subKeywords), startPoints: cfg.startPoints,
+    subKeywords: parseKeywords(cfg.subKeywords), likeKeywords: parseKeywords(cfg.likeKeywords || 'liked, like'), startPoints: cfg.startPoints,
     statusText: 'Connecting to live chat…',
   };
   startIdleFiller();
@@ -272,7 +278,7 @@ function startDemoInternal(cfg) {
   demoLikeCount = 0;
   session = {
     mode: 'demo', videoId: null, targetScore: cfg.targetScore,
-    subKeywords: parseKeywords(cfg.subKeywords), startPoints: cfg.startPoints,
+    subKeywords: parseKeywords(cfg.subKeywords), likeKeywords: parseKeywords(cfg.likeKeywords || 'liked, like'), startPoints: cfg.startPoints,
     statusText: '🧪 Demo mode — simulating chat activity (no real YouTube data).',
   };
   startBoostTimer();
@@ -368,7 +374,7 @@ const server = http.createServer(async (req, res) => {
   if (pathname === '/api/status' && req.method === 'GET') {
     sendJson(res, 200, {
       mode: session.mode, videoId: session.videoId, targetScore: session.targetScore,
-      subKeywords: session.subKeywords, startPoints: session.startPoints, statusText: session.statusText,
+      subKeywords: session.subKeywords, likeKeywords: session.likeKeywords, startPoints: session.startPoints, statusText: session.statusText,
     });
     return;
   }
@@ -401,7 +407,8 @@ const server = http.createServer(async (req, res) => {
       const cfg = {
         apiKey: body.apiKey ? String(body.apiKey).trim() : null, // optional: only needed for the like-count bonus
         videoId,
-        subKeywords: body.subKeywords, startPoints: parseInt(body.startPoints, 10) || 0,
+        subKeywords: body.subKeywords, likeKeywords: body.likeKeywords,
+        startPoints: parseInt(body.startPoints, 10) || 0,
         targetScore: parseInt(body.targetScore, 10) || 5000,
       };
       saveConfigToDisk(cfg);
@@ -417,7 +424,8 @@ const server = http.createServer(async (req, res) => {
     try {
       const body = await readJsonBody(req);
       startDemoInternal({
-        subKeywords: body.subKeywords, startPoints: parseInt(body.startPoints, 10) || 0,
+        subKeywords: body.subKeywords, likeKeywords: body.likeKeywords,
+        startPoints: parseInt(body.startPoints, 10) || 0,
         targetScore: parseInt(body.targetScore, 10) || 5000,
       });
       sendJson(res, 200, { ok: true });

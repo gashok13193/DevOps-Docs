@@ -194,6 +194,8 @@
     overtakes.forEach(overtake => facts.push(overtake.label));
     const lastSub = events.find(e => e.type === 'subscribe');
     if (lastSub) facts.push(`🔔 ${lastSub.authorName || 'Someone'} subscribed for ${nameOf(lastSub.code)}!`);
+    const lastLike = events.find(e => e.type === 'viewer-like');
+    if (lastLike) facts.push(`❤️ ${lastLike.authorName || 'Someone'} liked for ${nameOf(lastLike.code)}!`);
     const lastComment = events.find(e => e.type === 'comment' || e.type === 'chat');
     if (lastComment) {
       const message = lastComment.text ? `: ${lastComment.text}` : ` commented for ${nameOf(lastComment.code)}!`;
@@ -409,6 +411,14 @@
         speak(`${mover} moved ahead of ${passed} into place ${e.newRank}!`);
         return;
       }
+      if (e.type === 'viewer-like') {
+        bumpCard(e.code);
+        showPointPopup(e.code, `+${e.delta} ❤️`, true, e.authorName);
+        playSubscribeSound();
+        const countryName = (sorted.find(c => c.code === e.code) || {}).name || e.code.toUpperCase();
+        speak(`${e.authorName || 'Someone'} liked! ${countryName} gains ${e.delta} points!`);
+        return;
+      }
       if (!e.code) return; // e.g. like-bonus events aren't tied to a country
       bumpCard(e.code);
       showPointPopup(e.code, e.type === 'subscribe' ? '+100 🎉' : '+1', e.type === 'subscribe', e.authorName);
@@ -455,6 +465,7 @@
     const startPoints = parseInt(el('input-start-points').value, 10) || 0;
     targetScore = parseInt(el('input-target-score').value, 10) || 5000;
     const subKeywords = el('input-sub-keywords').value;
+    const likeKeywords = el('input-like-keywords').value;
 
     if (!videoId) {
       showSetup('Please enter a live video URL or ID.');
@@ -464,7 +475,7 @@
       const res = await fetch('/api/config', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ apiKey, videoId, subKeywords, startPoints, targetScore }),
+        body: JSON.stringify({ apiKey, videoId, subKeywords, likeKeywords, startPoints, targetScore }),
       });
       const data = await res.json();
       if (!res.ok || !data.ok) {
@@ -489,11 +500,12 @@
     const startPoints = parseInt(el('input-start-points').value, 10) || 0;
     targetScore = parseInt(el('input-target-score').value, 10) || 5000;
     const subKeywords = el('input-sub-keywords').value || 'subscribed, sub';
+    const likeKeywords = el('input-like-keywords').value || 'liked, like';
     try {
       await fetch('/api/demo', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ subKeywords, startPoints, targetScore }),
+        body: JSON.stringify({ subKeywords, likeKeywords, startPoints, targetScore }),
       });
       lastSeenEventTs = 0;
       showBoard();
@@ -524,6 +536,7 @@
       const status = await res.json();
       if (status.targetScore) el('input-target-score').value = status.targetScore;
       if (status.subKeywords && status.subKeywords.length) el('input-sub-keywords').value = status.subKeywords.join(', ');
+      if (status.likeKeywords && status.likeKeywords.length) el('input-like-keywords').value = status.likeKeywords.join(', ');
       if (status.startPoints != null) el('input-start-points').value = status.startPoints;
       if (status.videoId) el('input-video-id').value = status.videoId;
 

@@ -28,6 +28,7 @@ function freshState(startingPoints) {
     lastCountryByAuthor: {},
     userStats: {}, // authorId -> { name, comments }
     subscriptionBonusAuthors: {}, // authorId -> true after their one-time +100 bonus
+    likeBonusAuthors: {}, // authorId -> true after their one-time +10 bonus
     lastKnownLikeCount: null,
     likeGoalNext: 50, // next real-like-count milestone that triggers a 2x boost
     multiplier: 1,
@@ -47,6 +48,7 @@ function load(videoId, startingPoints) {
       }
       if (!state.userStats) state.userStats = {};
       if (!state.subscriptionBonusAuthors) state.subscriptionBonusAuthors = {};
+      if (!state.likeBonusAuthors) state.likeBonusAuthors = {};
       if (state.likeGoalNext == null) state.likeGoalNext = 50;
       if (state.multiplier == null) state.multiplier = 1;
       if (state.multiplierExpiresAt == null) state.multiplierExpiresAt = 0;
@@ -218,6 +220,24 @@ function addSubscribeBonus(code, authorName, authorId) {
   return true;
 }
 
+function addViewerLikeBonus(code, authorName, authorId) {
+  if (!code || !(code in state.countries)) return false;
+  if (authorId && state.likeBonusAuthors[authorId]) return false;
+  const previousRank = rankForCountry(code);
+  const mult = currentMultiplier();
+  const gained = 10 * mult;
+  state.countries[code] += gained;
+  if (authorId) state.likeBonusAuthors[authorId] = true;
+  const { comments, level } = bumpUserStats(authorId, authorName, 0, gained);
+  pushEvent({
+    type: 'viewer-like', code, delta: gained, authorId, authorName, comments, level,
+    label: `[Lvl ${level}] ${authorName || 'Someone'} liked! → ${countryName(code)} +${gained}`,
+  });
+  announceTopFortyOvertake(code, previousRank, gained);
+  save();
+  return true;
+}
+
 function addLikeBonus(deltaLikes) {
   if (deltaLikes <= 0) return;
   const gained = deltaLikes * 10;
@@ -284,7 +304,7 @@ function getLastKnownLikeCount() {
 
 module.exports = {
   load, save, hasProcessedMessage, markMessageProcessed,
-  addCommentPoint, addChatMessage, addSubscribeBonus, addLikeBonus,
+  addCommentPoint, addChatMessage, addSubscribeBonus, addViewerLikeBonus, addLikeBonus,
   getLastCountryForAuthor, getSortedCountries, getBonusPoints,
   getRecentEvents, reset, resetForNewRound, setLastKnownLikeCount, getLastKnownLikeCount,
   getUserStats, levelForComments, currentMultiplier, activateMultiplier, getMultiplierInfo, checkLikeGoal,
