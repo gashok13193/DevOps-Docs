@@ -11,7 +11,6 @@
   const raceTrack = el('race-track');
   const targetValueEl = el('target-value');
   const leaderBanner = el('leader-banner');
-  const liveCommentaryEl = el('live-commentary');
   const neonTitle = el('neon-title');
   const titleEmojiLeft = el('title-emoji-left');
   const titleEmojiRight = el('title-emoji-right');
@@ -175,52 +174,7 @@
     bannerTimer = null;
   }
 
-  let liveCommentaryFacts = [];
-  let liveCommentaryTimer = null;
-  let liveCommentaryIndex = 0;
   let subscriptionReminderTimer = null;
-
-  // Builds a fresh list of "who's leading / who subscribed / who's commenting" facts from
-  // the current state, so there's always something continuous to say even between events.
-  function buildLiveCommentaryFacts(sorted, events) {
-    const facts = [];
-    const leader = sorted[0];
-    if (leader) facts.push(`🏆 ${leader.name} is leading with ${leader.points} pts!`);
-    const second = sorted[1];
-    if (second) facts.push(`🥈 ${second.name} is in 2nd place with ${second.points} pts!`);
-    const third = sorted[2];
-    if (third) facts.push(`🥉 ${third.name} is in 3rd place with ${third.points} pts!`);
-    const nameOf = code => (sorted.find(c => c.code === code) || {}).name || (code || '').toUpperCase();
-    const challenge = events.find(e => e.type === 'challenge');
-    if (challenge) facts.push(`🎯 ${challenge.challenge.label}`);
-    const overtakes = events.filter(e => e.type === 'overtake').slice(0, 3);
-    overtakes.forEach(overtake => facts.push(overtake.label));
-    const lastSub = events.find(e => e.type === 'subscribe');
-    if (lastSub) facts.push(`🔔 ${lastSub.authorName || 'Someone'} subscribed for ${nameOf(lastSub.code)}!`);
-    const lastLike = events.find(e => e.type === 'viewer-like');
-    if (lastLike) facts.push(`❤️ ${lastLike.authorName || 'Someone'} liked for ${nameOf(lastLike.code)}!`);
-    const lastComment = events.find(e => e.type === 'comment' || e.type === 'chat');
-    if (lastComment) {
-      const message = lastComment.text ? `: ${lastComment.text}` : ` commented for ${nameOf(lastComment.code)}!`;
-      facts.push(`💬 ${lastComment.authorName || 'Someone'}${message}`);
-    }
-    return facts.length ? facts : ['💬 Comment your country to get on the board!'];
-  }
-
-  function startLiveCommentaryRotation() {
-    stopLiveCommentaryRotation();
-    liveCommentaryIndex = 0;
-    liveCommentaryTimer = setInterval(() => {
-      if (!liveCommentaryFacts.length) return;
-      liveCommentaryIndex = (liveCommentaryIndex + 1) % liveCommentaryFacts.length;
-      liveCommentaryEl.textContent = liveCommentaryFacts[liveCommentaryIndex];
-    }, 2500);
-  }
-
-  function stopLiveCommentaryRotation() {
-    if (liveCommentaryTimer) clearInterval(liveCommentaryTimer);
-    liveCommentaryTimer = null;
-  }
 
   function startSubscriptionReminder() {
     stopSubscriptionReminder();
@@ -239,7 +193,6 @@
   function showSetup(errorMsg) {
     stopPolling();
     stopBannerRotation();
-    stopLiveCommentaryRotation();
     stopSubscriptionReminder();
     stopMelody();
     setupScreen.classList.remove('hidden');
@@ -394,10 +347,6 @@
       : '<div class="ticker-item">Waiting for chat activity…</div>';
     renderRaceTrack(sorted);
 
-    liveCommentaryFacts = buildLiveCommentaryFacts(sorted, events);
-    if (liveCommentaryIndex >= liveCommentaryFacts.length) liveCommentaryIndex = 0;
-    liveCommentaryEl.textContent = liveCommentaryFacts[liveCommentaryIndex];
-
     const leader = sorted[0];
     if (leader) {
       const remaining = Math.max(0, targetScore - leader.points);
@@ -521,7 +470,6 @@
       lastSeenEventTs = 0;
       showBoard();
       startBannerRotation();
-      startLiveCommentaryRotation();
       startSubscriptionReminder();
       startPolling();
       startMelody();
@@ -546,7 +494,6 @@
       lastSeenEventTs = 0;
       showBoard();
       startBannerRotation();
-      startLiveCommentaryRotation();
       startSubscriptionReminder();
       startPolling();
       startMelody();
@@ -580,7 +527,6 @@
         targetScore = status.targetScore || 1000;
         showBoard();
         startBannerRotation();
-        startLiveCommentaryRotation();
         startSubscriptionReminder();
         startPolling();
         // No button click happened on this device, so autoplay policies block audio until
