@@ -36,8 +36,7 @@ let chatWatchdogTimer = null;
 let chatConnected = false;
 let likesQuotaExhausted = false;
 const IDLE_THRESHOLD_MS = 45000;
-const FILLER_THRESHOLD_MS = 180000;
-const CHAT_SILENCE_RECONNECT_MS = 90000;
+const CHAT_SILENCE_RECONNECT_MS = 60000;
 const FILLER_NAMES = [
   'Fan92-k9s', 'ViewerX-d7w', 'StreamBuddy-w6e', 'NightOwl-t2f',
   'ChatRider-q8m', 'PixelFan-r5j', 'QuickClap-b3n', 'GameLover-h9x',
@@ -151,7 +150,7 @@ function startRetentionTimers() {
 }
 
 // While connected to a real live stream, if no real chat message has arrived for
-// FILLER_THRESHOLD_MS (3 minutes), inject demo-like comment/subscribe/like events every 10s so the
+// IDLE_THRESHOLD_MS (45s), inject demo-like comment/subscribe/like events every 10s so the
 // board never looks dead during quiet stretches, without drowning out real viewer comments.
 // Reuses the small FILLER_NAMES pool (not a fresh identity every tick) so comment counts build
 // up toward real 10/20/30... milestones over time.
@@ -161,7 +160,7 @@ function startIdleFiller() {
   idleCommentTimer = setInterval(() => {
     if (session.mode !== 'live') return;
     if (!chatConnected) return;
-    if (Date.now() - lastChatActivity < FILLER_THRESHOLD_MS) return;
+    if (Date.now() - lastChatActivity < IDLE_THRESHOLD_MS) return;
     const country = COUNTRIES[Math.floor(Math.random() * COUNTRIES.length)];
     const name = FILLER_NAMES[Math.floor(Math.random() * FILLER_NAMES.length)];
     const roll = Math.random();
@@ -208,7 +207,6 @@ function startLiveInternal(cfg) {
 // The official Data API key, if provided, is now used ONLY for the optional real-like-count bonus.
 let videoInfoFailStreak = 0;
 let noChatStreak = 0;
-let continuationErrorStreak = 0;
 let activeLiveChat = null;
 
 function scheduleChatReconnect(cfg, delayMs, statusText) {
@@ -240,13 +238,12 @@ function connectChat(cfg) {
   activeLiveChat = null;
   if (previousLiveChat) previousLiveChat.stop();
 
-  const liveChat = new LiveChat({ liveId: cfg.videoId }, 5000);
+  const liveChat = new LiveChat({ liveId: cfg.videoId }, 3000);
   activeLiveChat = liveChat;
 
   liveChat.on('chat', chatItem => {
     if (session.mode !== 'live') return;
     lastChatActivity = Date.now();
-    continuationErrorStreak = 0;
     if (GameState.hasProcessedMessage(chatItem.id)) return;
     GameState.markMessageProcessed(chatItem.id);
     const text = (chatItem.message || [])
@@ -257,17 +254,8 @@ function connectChat(cfg) {
   });
 
   liveChat.on('error', err => {
-    const message = err && err.message ? err.message : String(err);
-    const isContinuationError = /continuation was not found/i.test(message);
-    if (isContinuationError) {
-      continuationErrorStreak += 1;
-      const delayMs = Math.min(120000, continuationErrorStreak * 30000);
-      console.warn(`youtube-chat continuation expired; retrying in ${delayMs / 1000}s.`);
-      if (activeLiveChat === liveChat) scheduleChatReconnect(cfg, delayMs, 'Live chat needs a fresh connection. Reconnecting…');
-      return;
-    }
-    console.error('youtube-chat error:', message); // terminal only
-    if (activeLiveChat === liveChat) scheduleChatReconnect(cfg, 30000, 'Live chat connection interrupted. Reconnecting…');
+    console.error('youtube-chat error:', err && err.message ? err.message : err); // terminal only
+    if (activeLiveChat === liveChat) scheduleChatReconnect(cfg, 15000, 'Live chat connection interrupted. Reconnecting…');
   });
 
   liveChat.on('end', reason => {

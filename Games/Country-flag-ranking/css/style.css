@@ -99,6 +99,13 @@ html, body {
   font-size: 12px; font-weight: 800; color: #ffcf33;
 }
 
+.live-commentary {
+  margin-top: 6px; text-align: center;
+  font-size: 12px; font-weight: 700; color: #86efac;
+  min-height: 16px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  transition: opacity 0.2s ease;
+}
+
 .milestone-card {
   position: fixed; top: 70px; left: 50%; transform: translateX(-50%);
   z-index: 20; width: min(320px, 90vw);
