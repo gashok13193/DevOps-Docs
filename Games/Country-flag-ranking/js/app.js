@@ -172,11 +172,18 @@
   let liveCommentaryTimer = null;
   let liveCommentaryIndex = 0;
   let subscriptionReminderTimer = null;
+  const evergreenCommentary = [
+    '💬 Comment your country to join the race!',
+    '🌍 Every vote can change the ranking.',
+    '🔔 Type COUNTRY SUB once for +100 points.',
+    '❤️ Type COUNTRY LIKE once for +10 points.',
+    '⚡ Watch for genuine overtakes and comebacks!',
+  ];
 
   // Builds a fresh list of "who's leading / who subscribed / who's commenting" facts from
   // the current state, so there's always something continuous to say even between events.
   function buildLiveCommentaryFacts(sorted, events) {
-    const facts = [];
+    const facts = [...evergreenCommentary];
     const leader = sorted[0];
     if (leader) facts.push(`🏆 ${leader.name} is leading with ${leader.points} pts!`);
     const second = sorted[1];
@@ -184,8 +191,14 @@
     const third = sorted[2];
     if (third) facts.push(`🥉 ${third.name} is in 3rd place with ${third.points} pts!`);
     const nameOf = code => (sorted.find(c => c.code === code) || {}).name || (code || '').toUpperCase();
+    const seenLabels = new Set();
     const overtakes = events.filter(e => e.type === 'overtake').slice(0, 3);
-    overtakes.forEach(overtake => facts.push(overtake.label));
+    overtakes.forEach(overtake => {
+      if (!seenLabels.has(overtake.label)) {
+        seenLabels.add(overtake.label);
+        facts.push(overtake.label);
+      }
+    });
     const lastSub = events.find(e => e.type === 'subscribe');
     if (lastSub) facts.push(`🔔 ${lastSub.authorName || 'Someone'} subscribed for ${nameOf(lastSub.code)}!`);
     const lastComment = events.find(e => e.type === 'comment' || e.type === 'chat');
@@ -193,7 +206,7 @@
       const message = lastComment.text ? `: ${lastComment.text}` : ` commented for ${nameOf(lastComment.code)}!`;
       facts.push(`💬 ${lastComment.authorName || 'Someone'}${message}`);
     }
-    return facts.length ? facts : ['💬 Comment your country to get on the board!'];
+    return facts;
   }
 
   function startLiveCommentaryRotation() {
