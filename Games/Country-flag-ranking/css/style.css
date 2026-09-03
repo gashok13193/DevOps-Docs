@@ -218,13 +218,6 @@ html, body {
 .multiplier-badge.hidden { display: none; }
 @keyframes multiplier-pulse { 0%,100%{opacity:1} 50%{opacity:0.6} }
 
-.challenge-banner {
-  margin-top: 6px; padding: 5px 8px; text-align: center;
-  background: #0b6b61; color: #effffb; border: 1px solid #57e6cf; border-radius: 8px;
-  font-size: 12px; font-weight: 800; line-height: 1.25;
-}
-.challenge-banner.hidden { display: none; }
-
 .ticker {
   margin-top: 6px; font-size: 11px; line-height: 1.5; min-height: 18px;
   max-height: 92px; overflow: hidden;
@@ -277,15 +270,14 @@ html, body {
   color: #ffe08a;
   text-shadow: 0 1px 3px rgba(0,0,0,0.8);
   pointer-events: none;
-  animation: float-up-fade 3s ease forwards;
+  animation: float-up-fade 1.3s ease forwards;
   z-index: 3;
   white-space: nowrap;
 }
 .point-popup.subscribe { color: #ff5da2; font-size: 15px; }
 @keyframes float-up-fade {
   0% { opacity: 0; transform: translate(-50%, 4px) scale(0.8); }
-  12% { opacity: 1; transform: translate(-50%, -6px) scale(1.1); }
-  78% { opacity: 1; transform: translate(-50%, -24px) scale(1); }
+  15% { opacity: 1; transform: translate(-50%, -6px) scale(1.1); }
   100% { opacity: 0; transform: translate(-50%, -34px) scale(1); }
 }
 

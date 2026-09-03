@@ -16,7 +16,7 @@ const CONFIG_FILE = path.join(__dirname, 'server', 'config.json');
 let session = {
   mode: 'idle', // 'idle' | 'live' | 'demo'
   videoId: null,
-  targetScore: 1000,
+  targetScore: 5000,
   subKeywords: ['subscribed', 'sub'],
   likeKeywords: ['liked', 'like'],
   startPoints: 1000,
@@ -25,9 +25,6 @@ let session = {
 let demoTimerHandle = null;
 let idleCommentTimer = null;
 let boostTimer = null;
-let challengeTimer = null;
-let challengeStartTimer = null;
-let supporterTimer = null;
 let boostSnapshot = {};
 let demoLikeCount = 0;
 let lastChatActivity = Date.now();
@@ -82,9 +79,6 @@ function stopAll(nextStatusText) {
   if (demoTimerHandle) { clearInterval(demoTimerHandle); demoTimerHandle = null; }
   if (chatReconnectTimer) { clearTimeout(chatReconnectTimer); chatReconnectTimer = null; }
   if (chatWatchdogTimer) { clearInterval(chatWatchdogTimer); chatWatchdogTimer = null; }
-  if (challengeTimer) { clearInterval(challengeTimer); challengeTimer = null; }
-  if (challengeStartTimer) { clearTimeout(challengeStartTimer); challengeStartTimer = null; }
-  if (supporterTimer) { clearInterval(supporterTimer); supporterTimer = null; }
   chatConnected = false;
   stopIdleFiller();
   stopBoostTimer();
@@ -116,37 +110,6 @@ function startBoostTimer() {
 function stopBoostTimer() {
   if (boostTimer) clearInterval(boostTimer);
   boostTimer = null;
-}
-
-function startRetentionTimers() {
-  if (challengeTimer) clearInterval(challengeTimer);
-  if (challengeStartTimer) clearTimeout(challengeStartTimer);
-  if (supporterTimer) clearInterval(supporterTimer);
-  const startChallenge = () => {
-    if (session.mode === 'idle' || GameState.getActiveChallenge()) return;
-    const sorted = GameState.getSortedCountries();
-    if (!sorted.length) return;
-    const roll = Math.random();
-    if (roll < 0.4) {
-      const country = sorted[Math.floor(Math.random() * Math.min(8, sorted.length))];
-      GameState.startChallenge({ type: 'country-double', countryCode: country.code, expiresAt: Date.now() + 60000,
-        label: `${country.name} Rush! Every ${country.name} vote is worth 2x for 60 seconds!` });
-    } else if (roll < 0.7) {
-      GameState.startChallenge({ type: 'underdog-double', expiresAt: Date.now() + 60000,
-        label: 'Underdog Rush! Countries outside the top 20 are worth 2x for 60 seconds!' });
-    } else {
-      GameState.startChallenge({ type: 'sprint', expiresAt: Date.now() + 90000, goal: 15, bonus: 25, votes: {},
-        label: 'Sprint Challenge! First country to get 15 votes wins +25 points!' });
-    }
-  };
-  challengeStartTimer = setTimeout(() => {
-    challengeStartTimer = null;
-    startChallenge();
-  }, 45000);
-  challengeTimer = setInterval(startChallenge, 150000);
-  supporterTimer = setInterval(() => {
-    if (session.mode !== 'idle') GameState.announceTopSupporter();
-  }, 90000);
 }
 
 // While connected to a real live stream, if no real chat message has arrived for
@@ -196,7 +159,6 @@ function startLiveInternal(cfg) {
   };
   startIdleFiller();
   startBoostTimer();
-  startRetentionTimers();
   connectChat(cfg);
 }
 
@@ -320,7 +282,6 @@ function startDemoInternal(cfg) {
     statusText: '🧪 Demo mode — simulating chat activity (no real YouTube data).',
   };
   startBoostTimer();
-  startRetentionTimers();
   const sampleNames = [
     'Aria-k9s', 'Leo-d7w', 'Maya-c4p', 'Noah-t2f', 'Zoe-q8m', 'Kai-r5j', 'Ivy-b3n', 'Omar-h9x',
     'FirasGaming-p4c', 'HarshitaPrajapat-m3v', 'Yesenia-x7z',
@@ -425,7 +386,6 @@ const server = http.createServer(async (req, res) => {
       bonusPoints: active ? GameState.getBonusPoints() : 0,
       recentEvents: active ? GameState.getRecentEvents() : [],
       targetScore: session.targetScore,
-      activeChallenge: active ? GameState.getActiveChallenge() : null,
       statusText: session.statusText,
       mode: session.mode,
     });
@@ -449,7 +409,7 @@ const server = http.createServer(async (req, res) => {
         videoId,
         subKeywords: body.subKeywords, likeKeywords: body.likeKeywords,
         startPoints: parseInt(body.startPoints, 10) || 0,
-        targetScore: parseInt(body.targetScore, 10) || 1000,
+        targetScore: parseInt(body.targetScore, 10) || 5000,
       };
       saveConfigToDisk(cfg);
       startLiveInternal(cfg);
@@ -466,7 +426,7 @@ const server = http.createServer(async (req, res) => {
       startDemoInternal({
         subKeywords: body.subKeywords, likeKeywords: body.likeKeywords,
         startPoints: parseInt(body.startPoints, 10) || 0,
-        targetScore: parseInt(body.targetScore, 10) || 1000,
+        targetScore: parseInt(body.targetScore, 10) || 5000,
       });
       sendJson(res, 200, { ok: true });
     } catch (err) {
