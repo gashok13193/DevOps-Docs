@@ -150,9 +150,9 @@
 
   const BANNER_MESSAGES = [
     { left: '🌍', title: 'WHERE ARE<br />YOU FROM?', right: '😎' },
-    { left: '🔔', title: 'TYPE "INDIA SUB"<br />FOR +100', right: '🔔' },
+    { left: '🔔', title: 'TYPE "COUNTRY SUB"<br />FOR +100', right: '🔔' },
     { left: '💬', title: 'COMMENT YOUR<br />COUNTRY = +1', right: '💬' },
-    { left: '❤️', title: 'TYPE "INDIA LIKE"<br />FOR +10', right: '❤️' },
+    { left: '❤️', title: 'TYPE "COUNTRY LIKE"<br />FOR +10', right: '❤️' },
   ];
 
   function startBannerRotation() {
