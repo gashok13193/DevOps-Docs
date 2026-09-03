@@ -11,7 +11,6 @@
   const raceTrack = el('race-track');
   const targetValueEl = el('target-value');
   const leaderBanner = el('leader-banner');
-  const activityLine = el('activity-line');
   const neonTitle = el('neon-title');
   const titleEmojiLeft = el('title-emoji-left');
   const titleEmojiRight = el('title-emoji-right');
@@ -28,16 +27,6 @@
   let lastSeenEventTs = 0;
   let soundEnabled = true;
   let audioCtx = null;
-  let activityTimer = null;
-  let activityIndex = 0;
-  let activityMessages = [
-    '💬 Every country vote can change the race!',
-    '🌍 Type your country name or flag to join the ranking.',
-    '🔔 Type COUNTRY SUB once for a +100 bonus.',
-    '❤️ Type COUNTRY LIKE once for a +10 bonus.',
-    '⚡ Watch the top 40 for real overtakes and comebacks!',
-  ];
-  let latestActivityEventTs = 0;
 
   function escapeHtml(value) {
     return String(value).replace(/[&<>'"]/g, character => ({
@@ -185,20 +174,6 @@
     bannerTimer = null;
   }
 
-  function startActivityRotation() {
-    if (activityTimer) clearInterval(activityTimer);
-    activityTimer = setInterval(() => {
-      if (!activityMessages.length) return;
-      activityIndex = (activityIndex + 1) % activityMessages.length;
-      activityLine.textContent = activityMessages[activityIndex];
-    }, 4000);
-  }
-
-  function stopActivityRotation() {
-    if (activityTimer) clearInterval(activityTimer);
-    activityTimer = null;
-  }
-
   let subscriptionReminderTimer = null;
 
   function startSubscriptionReminder() {
@@ -218,7 +193,6 @@
   function showSetup(errorMsg) {
     stopPolling();
     stopBannerRotation();
-    stopActivityRotation();
     stopSubscriptionReminder();
     stopMelody();
     setupScreen.classList.remove('hidden');
@@ -368,22 +342,6 @@
     }
 
     const events = data.recentEvents || [];
-    const newestEvent = events[0];
-    const eventMessage = newestEvent && newestEvent.ts > latestActivityEventTs
-      ? newestEvent.label : null;
-    if (newestEvent && newestEvent.ts > latestActivityEventTs) latestActivityEventTs = newestEvent.ts;
-    const challengeMessage = data.activeChallenge ? `🎯 ${data.activeChallenge.label}` : null;
-    activityMessages = [
-      '💬 Every country vote can change the race!',
-      '🌍 Type your country name or flag to join the ranking.',
-      '🔔 Type COUNTRY SUB once for a +100 bonus.',
-      '❤️ Type COUNTRY LIKE once for a +10 bonus.',
-      '⚡ Watch the top 40 for real overtakes and comebacks!',
-      ...(challengeMessage ? [challengeMessage] : []),
-      ...(eventMessage ? [eventMessage] : []),
-    ];
-    if (activityIndex >= activityMessages.length) activityIndex = 0;
-    activityLine.textContent = activityMessages[activityIndex];
     ticker.innerHTML = events.length
       ? events.slice(0, 5).map(e => `<div class="ticker-item">${escapeHtml(e.label)}</div>`).join('')
       : '<div class="ticker-item">Waiting for chat activity…</div>';
@@ -512,7 +470,6 @@
       lastSeenEventTs = 0;
       showBoard();
       startBannerRotation();
-      startActivityRotation();
       startSubscriptionReminder();
       startPolling();
       startMelody();
@@ -537,7 +494,6 @@
       lastSeenEventTs = 0;
       showBoard();
       startBannerRotation();
-      startActivityRotation();
       startSubscriptionReminder();
       startPolling();
       startMelody();
@@ -571,7 +527,6 @@
         targetScore = status.targetScore || 1000;
         showBoard();
         startBannerRotation();
-        startActivityRotation();
         startSubscriptionReminder();
         startPolling();
         // No button click happened on this device, so autoplay policies block audio until
