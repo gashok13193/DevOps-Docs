@@ -319,15 +319,12 @@
 
   let subscribeHideTimer = null;
 
-  // Shows an engagement celebration card for a reported subscription or like.
-  function showSubscribeCard(e, countryName, isLike = false) {
+  // Shows the "new subscriber" celebration card (flag, name, country, +100 points) for a few seconds.
+  function showSubscribeCard(e, countryName) {
     el('subscribe-flag').src = flagUrl(e.code);
     el('subscribe-flag').alt = countryName;
     el('subscribe-name').textContent = e.authorName ? `@${e.authorName}` : 'Someone';
     el('subscribe-country').textContent = countryName;
-    el('subscribe-badge').textContent = isLike ? '❤️ New Like!' : '🔔 New Subscriber!';
-    el('subscribe-points').textContent = `+${e.delta} Points! ${isLike ? '❤️' : '🎉'}`;
-    subscribeCard.classList.toggle('like-card', isLike);
     subscribeCard.classList.remove('hidden');
     if (subscribeHideTimer) clearTimeout(subscribeHideTimer);
     subscribeHideTimer = setTimeout(() => subscribeCard.classList.add('hidden'), 4000);
@@ -420,7 +417,6 @@
         playSubscribeSound();
         const countryName = (sorted.find(c => c.code === e.code) || {}).name || e.code.toUpperCase();
         speak(`${e.authorName || 'Someone'} liked! ${countryName} gains ${e.delta} points!`);
-        showSubscribeCard(e, countryName, true);
         return;
       }
       if (!e.code) return; // e.g. like-bonus events aren't tied to a country

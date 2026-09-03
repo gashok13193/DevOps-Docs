@@ -141,12 +141,10 @@ html, body {
   animation: milestone-in 0.4s ease;
 }
 .subscribe-card.hidden { display: none; }
-.subscribe-card.like-card { background: linear-gradient(160deg, #d9154d, #ff7a45); box-shadow: 0 8px 24px rgba(0,0,0,0.5), 0 0 20px rgba(255,91,88,0.5); }
 .subscribe-badge {
   display: inline-block; background: #fff; color: #7a2cff;
   font-size: 11px; font-weight: 800; padding: 3px 10px; border-radius: 20px; margin-bottom: 8px;
 }
-.subscribe-card.like-card .subscribe-badge { color: #bd133e; }
 .subscribe-flag { width: 56px; height: 38px; object-fit: cover; border-radius: 4px; border: 2px solid #fff; }
 .subscribe-name { font-size: 15px; font-weight: 800; color: #fff; margin-top: 6px; }
 .subscribe-country { font-size: 12px; color: #ffe5f5; font-weight: 700; }
